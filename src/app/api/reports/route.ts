@@ -1,11 +1,15 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 import { aiGenerateReport } from '@/lib/ai'
 
 // ========== GET: Get reports for project ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    const sessionUserId = auth.error ? undefined : auth.user.id
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
 
@@ -50,6 +54,10 @@ const generateReportSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = generateReportSchema.safeParse(body)
 
@@ -60,7 +68,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { projectId, userId } = parsed.data
+    const { projectId } = parsed.data
 
     // Get project with members and tasks
     const project = await db.project.findUnique({
@@ -117,7 +125,7 @@ export async function POST(req: NextRequest) {
 
         return {
           name: member.user.name || member.user.email,
-          completedTasks: memberTasks.filter((t) => t.status === 'verified_completed').length,
+          completedTasks: memberTasks.filter((t) => t.status === 'verified_completed' || t.status === 'submitted').length,
           verifiedTasks: memberTasks.filter((t) => t.status === 'verified_completed').length,
           totalHours: memberTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0),
           checkins: checkinCount,
@@ -138,7 +146,7 @@ export async function POST(req: NextRequest) {
     const aiRequest = await db.aiRequest.create({
       data: {
         projectId,
-        userId,
+        userId: sessionUserId,
         type: 'generate_report',
         prompt: JSON.stringify({ taskStats, teamContributions, milestoneData }),
         status: 'processing',
@@ -221,7 +229,7 @@ export async function POST(req: NextRequest) {
       await db.activityLog.create({
         data: {
           projectId,
-          userId,
+          userId: sessionUserId,
           action: 'report_generated',
           description: `Generated AI project report for "${project.name}"`,
           metadata: JSON.stringify({ reportId: report.id }),

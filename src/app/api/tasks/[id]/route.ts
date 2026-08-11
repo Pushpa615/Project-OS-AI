@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: Get single task with dependencies, evidence, comments ==========
 export async function GET(
@@ -8,6 +9,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+
     const { id } = await params
 
     const task = await db.task.findUnique({
@@ -79,7 +83,7 @@ const updateTaskSchema = z.object({
   description: z.string().optional(),
   assignedTo: z.string().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-  status: z.string().optional(),
+  status: z.enum(['not_started','in_progress','submitted','under_review','verified_completed','overdue']).optional(),
   startDate: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional(),
   estimatedHours: z.number().positive().nullable().optional(),
@@ -95,6 +99,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = updateTaskSchema.safeParse(body)
@@ -106,7 +114,7 @@ export async function PUT(
       )
     }
 
-    const { userId, ...updateFields } = parsed.data
+    const { userId: _userId, ...updateFields } = parsed.data
 
     // Check task exists
     const existingTask = await db.task.findUnique({
@@ -140,7 +148,7 @@ export async function PUT(
     // Handle verified_completed status
     if (updateFields.status === 'verified_completed') {
       data.verifiedAt = new Date()
-      data.verifiedBy = userId
+      data.verifiedBy = sessionUserId
       data.completionPercent = 100
     }
 
@@ -178,7 +186,7 @@ export async function PUT(
     await db.activityLog.create({
       data: {
         projectId: existingTask.projectId,
-        userId,
+        userId: sessionUserId,
         action: 'task_updated',
         description: `Updated task "${existingTask.title}"`,
         metadata: JSON.stringify({

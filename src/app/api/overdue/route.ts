@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: Get overdue tasks ==========
 export async function GET(req: NextRequest) {
@@ -50,6 +51,9 @@ export async function GET(req: NextRequest) {
 // ========== POST: Check and update overdue tasks ==========
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+
     const now = new Date()
 
     // Find all tasks that are overdue but not yet marked

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 import { aiAnalyzeEvidence } from '@/lib/ai'
 
 // ========== POST: Verify task using AI ==========
@@ -13,6 +14,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = verifyTaskSchema.safeParse(body)
@@ -24,7 +29,7 @@ export async function POST(
       )
     }
 
-    const { userId } = parsed.data
+    const { userId: _userId } = parsed.data
 
     // Check task exists with evidence
     const task = await db.task.findUnique({
@@ -56,7 +61,7 @@ export async function POST(
       data: {
         projectId: task.projectId,
         taskId: id,
-        userId,
+        userId: sessionUserId,
         type: 'verify_evidence',
         prompt: JSON.stringify({
           taskTitle: task.title,
@@ -140,7 +145,7 @@ export async function POST(
           status: newStatus,
           ...(newStatus === 'verified_completed' ? {
             verifiedAt: new Date(),
-            verifiedBy: userId,
+            verifiedBy: sessionUserId,
             completionPercent: 100,
           } : {}),
         },
@@ -150,7 +155,7 @@ export async function POST(
       await db.activityLog.create({
         data: {
           projectId: task.projectId,
-          userId,
+          userId: sessionUserId,
           action: 'task_verified',
           description: `AI verified task "${task.title}"`,
           metadata: JSON.stringify({

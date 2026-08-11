@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 import { aiChat, aiCodeHelp, aiBugHelp } from '@/lib/ai'
 
 // ========== POST: General AI chat ==========
@@ -15,6 +16,10 @@ const aiChatSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = aiChatSchema.safeParse(body)
 
@@ -25,10 +30,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { userId, projectId, taskId, type, question, context } = parsed.data
+    const { userId: _userId, projectId, taskId, type, question, context } = parsed.data
 
     // Verify user exists
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await db.user.findUnique({ where: { id: sessionUserId } })
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
       data: {
         projectId: projectId || null,
         taskId: taskId || null,
-        userId,
+        userId: sessionUserId,
         type: `chat_${type}`,
         prompt: question,
         status: 'processing',

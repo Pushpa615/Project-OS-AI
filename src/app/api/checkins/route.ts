@@ -1,13 +1,18 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 import { aiAnalyzeCheckin } from '@/lib/ai'
 
 // ========== GET: Get checkins ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
     const date = searchParams.get('date')
 
     if (!userId) {
@@ -56,6 +61,10 @@ const checkinSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = checkinSchema.safeParse(body)
 
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      userId,
+      userId: bodyUserId,
       projectId,
       date,
       completed,
@@ -77,6 +86,8 @@ export async function POST(req: NextRequest) {
       remains,
       needHelp,
     } = parsed.data
+
+    const userId = bodyUserId || sessionUserId
 
     // Check if user exists
     const user = await db.user.findUnique({ where: { id: userId } })

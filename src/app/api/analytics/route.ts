@@ -1,12 +1,16 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: Get analytics for project or user ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    const sessionUserId = auth.error ? undefined : auth.user.id
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
 
     // Determine which projects to analyze
     let projectIds: string[] = []
@@ -135,12 +139,17 @@ export async function GET(req: NextRequest) {
     const uniqueMemberIds = [...new Set(allMembers.map((m) => m.userId))]
     const teamStats: Array<{userId: string; name: string; role: string; avatar: string | null; totalTasks: number; completedTasks: number; inProgressTasks: number; overdueTasks: number; totalHours: number; estimatedHours: number; checkinCount: number; contributionScore: number}> = []
 
+    const checkinCounts = await db.dailyCheckin.groupBy({
+      by: ['userId'],
+      _count: true,
+      where: { userId: { in: uniqueMemberIds } },
+    })
+    const checkinCountMap = new Map(checkinCounts.map(c => [c.userId, c._count]))
+
     for (const memberId of uniqueMemberIds) {
       const memberTasks = tasks.filter((t) => t.assignedTo === memberId)
       const member = allMembers.find((m) => m.userId === memberId)
-      const checkinCount = await db.dailyCheckin.count({
-        where: { userId: memberId },
-      })
+      const checkinCount = checkinCountMap.get(memberId) || 0
 
       teamStats.push({
         userId: memberId,

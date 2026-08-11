@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 import { aiGeneratePlan } from '@/lib/ai'
 
 // ========== POST: Generate AI plan for project ==========
@@ -13,6 +14,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = generatePlanSchema.safeParse(body)
@@ -24,7 +29,7 @@ export async function POST(
       )
     }
 
-    const { userId } = parsed.data
+    const { userId: _userId } = parsed.data
 
     // Check project exists
     const project = await db.project.findUnique({
@@ -70,7 +75,7 @@ export async function POST(
     const aiRequest = await db.aiRequest.create({
       data: {
         projectId: id,
-        userId,
+        userId: sessionUserId,
         type: 'generate_plan',
         prompt: JSON.stringify(projectData),
         status: 'processing',
@@ -178,7 +183,7 @@ export async function POST(
       await db.activityLog.create({
         data: {
           projectId: id,
-          userId,
+          userId: sessionUserId,
           action: 'plan_generated',
           description: 'AI-generated project plan created',
           metadata: JSON.stringify({

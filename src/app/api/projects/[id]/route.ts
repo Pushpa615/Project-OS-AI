@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: Get single project with members, milestones, task stats ==========
 export async function GET(
@@ -8,6 +9,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
 
     const project = await db.project.findUnique({
@@ -81,7 +86,7 @@ const updateProjectSchema = z.object({
   techStack: z.array(z.string()).optional(),
   features: z.array(z.string()).optional(),
   requirements: z.string().optional(),
-  status: z.string().optional(),
+  status: z.enum(['active','completed','archived','on_hold']).optional(),
   progress: z.number().min(0).max(100).optional(),
 })
 
@@ -90,6 +95,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = updateProjectSchema.safeParse(body)
@@ -101,7 +110,7 @@ export async function PUT(
       )
     }
 
-    const { userId, ...updateFields } = parsed.data
+    const { userId: _userId, ...updateFields } = parsed.data
 
     // Check project exists
     const project = await db.project.findUnique({ where: { id } })
@@ -141,7 +150,7 @@ export async function PUT(
     await db.activityLog.create({
       data: {
         projectId: id,
-        userId,
+        userId: sessionUserId,
         action: 'project_updated',
         description: `Updated project "${project.name}"`,
         metadata: JSON.stringify({ fields: Object.keys(updateFields) }),
@@ -171,6 +180,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = deleteProjectSchema.safeParse(body)
@@ -182,7 +195,7 @@ export async function DELETE(
       )
     }
 
-    const { userId } = parsed.data
+    const { userId: _userId } = parsed.data
 
     // Check project exists
     const project = await db.project.findUnique({ where: { id } })
@@ -203,7 +216,7 @@ export async function DELETE(
     await db.activityLog.create({
       data: {
         projectId: id,
-        userId,
+        userId: sessionUserId,
         action: 'project_archived',
         description: `Archived project "${project.name}"`,
       },

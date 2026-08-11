@@ -1,10 +1,14 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List tasks ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    const sessionUserId = auth.error ? undefined : auth.user.id
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
     const assignedTo = searchParams.get('assignedTo')
@@ -62,7 +66,7 @@ const createTaskSchema = z.object({
   description: z.string().optional().default(''),
   assignedTo: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-  status: z.string().default('not_started'),
+  status: z.enum(['not_started','in_progress','submitted','under_review','verified_completed','overdue']).default('not_started'),
   startDate: z.string().optional().default(''),
   dueDate: z.string().optional().default(''),
   estimatedHours: z.number().positive().optional(),
@@ -75,6 +79,10 @@ const createTaskSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = createTaskSchema.safeParse(body)
 

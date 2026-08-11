@@ -1,12 +1,17 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List notifications ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
     const unreadOnly = searchParams.get('unread')
 
     if (!userId) {
@@ -52,6 +57,10 @@ const markReadSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = markReadSchema.safeParse(body)
 
@@ -65,7 +74,7 @@ export async function POST(req: NextRequest) {
     const { notificationIds } = parsed.data
 
     await db.notification.updateMany({
-      where: { id: { in: notificationIds } },
+      where: { id: { in: notificationIds }, userId: sessionUserId },
       data: { read: true },
     })
 
@@ -94,6 +103,10 @@ const updatePrefsSchema = z.object({
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = updatePrefsSchema.safeParse(body)
 
@@ -104,7 +117,7 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    const { userId, ...updateFields } = parsed.data
+    const { userId: _userId, ...updateFields } = parsed.data
 
     // Build update data
     const data: Record<string, unknown> = {}
@@ -117,9 +130,9 @@ export async function PUT(req: NextRequest) {
 
     // Upsert notification preferences
     const prefs = await db.notificationPreference.upsert({
-      where: { userId },
+      where: { userId: sessionUserId },
       create: {
-        userId,
+        userId: sessionUserId,
         ...data,
       },
       update: data,

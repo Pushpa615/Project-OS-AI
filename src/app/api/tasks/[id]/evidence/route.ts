@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== POST: Add evidence ==========
 const addEvidenceSchema = z.object({
@@ -17,6 +18,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = addEvidenceSchema.safeParse(body)
@@ -28,7 +33,7 @@ export async function POST(
       )
     }
 
-    const { userId, type, title, description, url, fileName } = parsed.data
+    const { userId: _userId, type, title, description, url, fileName } = parsed.data
 
     // Check task exists
     const task = await db.task.findUnique({
@@ -58,7 +63,7 @@ export async function POST(
     await db.activityLog.create({
       data: {
         projectId: task.projectId,
-        userId,
+        userId: sessionUserId,
         action: 'evidence_added',
         description: `Added evidence "${title}" to task "${task.title}"`,
         metadata: JSON.stringify({ taskId: id, evidenceId: evidence.id, type }),
@@ -84,6 +89,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    const sessionUserId = auth.error ? undefined : auth.user.id
+
     const { id } = await params
 
     const evidence = await db.taskEvidence.findMany({

@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
     // For demo purposes, just return success.
     return NextResponse.json({
       message: 'If an account with that email exists, a reset link has been sent.',
-      data: { token }, // Only for demo/testing purposes
     })
   } catch (error) {
     console.error('Forgot password error:', error)

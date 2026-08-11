@@ -1,10 +1,14 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List comments ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
     const taskId = searchParams.get('taskId')
@@ -51,6 +55,10 @@ const createCommentSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = createCommentSchema.safeParse(body)
 
@@ -61,7 +69,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { userId, projectId, taskId, content, mentions } = parsed.data
+    const { projectId, taskId, content, mentions } = parsed.data
 
     if (!projectId && !taskId) {
       return NextResponse.json(
@@ -71,13 +79,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify user exists
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await db.user.findUnique({ where: { id: sessionUserId } })
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       )
     }
+
+    const userId = sessionUserId
 
     // Determine the task's projectId if not provided
     let effectiveProjectId = projectId

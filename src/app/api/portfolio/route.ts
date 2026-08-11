@@ -1,12 +1,17 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List portfolios ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
 
     if (!userId) {
       return NextResponse.json(
@@ -46,6 +51,10 @@ const createPortfolioSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = createPortfolioSchema.safeParse(body)
 
@@ -57,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      userId,
+      userId: bodyUserId,
       projectId,
       title,
       description,
@@ -68,6 +77,8 @@ export async function POST(req: NextRequest) {
       liveUrl,
       isPublic,
     } = parsed.data
+
+    const userId = bodyUserId || sessionUserId
 
     // Verify user exists
     const user = await db.user.findUnique({ where: { id: userId } })
@@ -123,6 +134,10 @@ const updatePortfolioSchema = z.object({
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = updatePortfolioSchema.safeParse(body)
 
@@ -135,7 +150,7 @@ export async function PUT(req: NextRequest) {
 
     const {
       id,
-      userId,
+      userId: _bodyUserId,
       projectId,
       title,
       description,
@@ -149,7 +164,7 @@ export async function PUT(req: NextRequest) {
 
     // Verify the portfolio exists and belongs to the user
     const existing = await db.portfolio.findFirst({
-      where: { id, userId },
+      where: { id, userId: sessionUserId },
     })
 
     if (!existing) {
@@ -190,9 +205,13 @@ export async function PUT(req: NextRequest) {
 // ========== DELETE: Delete portfolio ==========
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
 
     if (!id) {
       return NextResponse.json(
@@ -210,7 +229,7 @@ export async function DELETE(req: NextRequest) {
 
     // Verify the portfolio exists and belongs to the user
     const existing = await db.portfolio.findFirst({
-      where: { id, userId },
+      where: { id, userId: sessionUserId },
     })
 
     if (!existing) {

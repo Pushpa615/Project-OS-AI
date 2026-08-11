@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 const onboardingSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
@@ -15,8 +16,12 @@ const onboardingSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
@@ -62,6 +67,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = onboardingSchema.safeParse(body)
 
@@ -72,7 +81,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { userId, fullName, college, course, academicYear, phone, bio, skills } = parsed.data
+    const { fullName, college, course, academicYear, phone, bio, skills } = parsed.data
+    const userId = sessionUserId
 
     // Check if user exists
     const user = await db.user.findUnique({ where: { id: userId } })
@@ -142,6 +152,10 @@ export async function POST(req: NextRequest) {
 // ========== PUT: Update profile (settings page) ==========
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = onboardingSchema.safeParse(body)
 
@@ -152,7 +166,8 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    const { userId, fullName, college, course, academicYear, phone, bio, skills } = parsed.data
+    const { fullName, college, course, academicYear, phone, bio, skills } = parsed.data
+    const userId = sessionUserId
 
     const user = await db.user.findUnique({ where: { id: userId } })
     if (!user) {

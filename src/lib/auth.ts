@@ -48,5 +48,5 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/",
   },
-  secret: process.env.NEXTAUTH_SECRET || "project-os-ai-secret-change-in-production",
+  secret: process.env.NEXTAUTH_SECRET!,
 }

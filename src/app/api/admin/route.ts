@@ -1,22 +1,14 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 // ========== GET: Admin system data ==========
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
-    }
-
-    // Verify admin
-    const admin = await db.user.findUnique({ where: { id: userId } })
-    if (!admin || admin.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdmin(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
 
     // Fetch all users with profile
     const users = await db.user.findMany({
@@ -120,6 +112,10 @@ const updateRoleSchema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = updateRoleSchema.safeParse(body)
 
@@ -127,16 +123,10 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Validation failed' }, { status: 400 })
     }
 
-    const { adminUserId, targetUserId, newRole } = parsed.data
-
-    // Verify admin
-    const admin = await db.user.findUnique({ where: { id: adminUserId } })
-    if (!admin || admin.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const { targetUserId, newRole } = parsed.data
 
     // Prevent self-demotion
-    if (adminUserId === targetUserId) {
+    if (sessionUserId === targetUserId) {
       return NextResponse.json({ error: 'Cannot change your own role' }, { status: 400 })
     }
 
@@ -150,7 +140,7 @@ export async function PATCH(req: NextRequest) {
     // Log activity
     await db.activityLog.create({
       data: {
-        userId: adminUserId,
+        userId: sessionUserId,
         action: 'role_changed',
         description: `Changed ${updated.name || updated.email}'s role to ${newRole}`,
         metadata: JSON.stringify({ targetUserId, newRole }),

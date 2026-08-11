@@ -1,10 +1,14 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List files ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
 
@@ -41,6 +45,10 @@ const uploadFileSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = uploadFileSchema.safeParse(body)
 
@@ -51,7 +59,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { projectId, userId, fileName, fileSize, mimeType } = parsed.data
+    const { projectId, fileName, fileSize, mimeType } = parsed.data
 
     // Check project exists
     const project = await db.project.findUnique({ where: { id: projectId } })
@@ -73,7 +81,7 @@ export async function POST(req: NextRequest) {
         filePath,
         fileSize: fileSize || null,
         mimeType: mimeType || null,
-        uploadedBy: userId,
+        uploadedBy: sessionUserId,
       },
     })
 
@@ -81,7 +89,7 @@ export async function POST(req: NextRequest) {
     await db.activityLog.create({
       data: {
         projectId,
-        userId,
+        userId: sessionUserId,
         action: 'file_uploaded',
         description: `Uploaded file "${fileName}"`,
         metadata: JSON.stringify({ fileId: file.id, fileSize, mimeType }),

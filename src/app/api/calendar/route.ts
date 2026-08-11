@@ -1,10 +1,14 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: Get calendar events ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    const sessionUserId = auth.error ? undefined : auth.user.id
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
 
@@ -160,6 +164,10 @@ const createEventSchema = z.discriminatedUnion('type', [
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = createEventSchema.safeParse(body)
 
@@ -185,10 +193,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (data.type === 'meeting') {
-      const meetingCount = await db.meeting.count({
-        where: { projectId: data.projectId },
-      })
-
       const meeting = await db.meeting.create({
         data: {
           projectId: data.projectId,
@@ -220,10 +224,6 @@ export async function POST(req: NextRequest) {
       )
     } else {
       // Milestone
-      const milestoneCount = await db.milestone.count({
-        where: { projectId: data.projectId },
-      })
-
       const milestone = await db.milestone.create({
         data: {
           projectId: data.projectId,
@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
           dueDate: eventDate,
           status: 'not_started',
           progress: 0,
-          order: milestoneCount,
+          order: 0,
         },
       })
 

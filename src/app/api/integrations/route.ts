@@ -1,12 +1,17 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List connected accounts ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
 
     if (!userId) {
       return NextResponse.json(
@@ -40,6 +45,10 @@ const connectAccountSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = connectAccountSchema.safeParse(body)
 
@@ -50,7 +59,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { userId, provider, displayName, url } = parsed.data
+    const { userId: bodyUserId, provider, displayName, url } = parsed.data
+
+    const userId = bodyUserId || sessionUserId
 
     // Check user exists and has a profile (required for ConnectedAccount FK)
     const user = await db.user.findUnique({
@@ -110,16 +121,26 @@ export async function POST(req: NextRequest) {
 // ========== DELETE: Disconnect account ==========
 export async function DELETE(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { userId, provider, id } = body
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
 
-    // Support both body (from frontend) and query params (backward compat)
-    if (!userId) {
+    const body = await req.json()
+
+    const deleteSchema = z.object({
+      userId: z.string().min(1),
+      provider: z.string().min(1),
+      id: z.string().min(1),
+    })
+    const parsed = deleteSchema.safeParse(body)
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'userId is required' },
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       )
     }
+
+    const { userId, provider, id } = parsed.data
 
     if (id) {
       // Delete by ID (frontend sends this way)

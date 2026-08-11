@@ -1,12 +1,16 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List projects for user ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    const sessionUserId = auth.error ? undefined : auth.user.id
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
 
     if (!userId) {
       return NextResponse.json(
@@ -69,6 +73,10 @@ const createProjectSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const body = await req.json()
     const parsed = createProjectSchema.safeParse(body)
 
@@ -80,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      userId,
+      userId: bodyUserId,
       name,
       description,
       projectType,
@@ -95,7 +103,7 @@ export async function POST(req: NextRequest) {
     } = parsed.data
 
     // Verify user exists
-    const user = await db.user.findUnique({ where: { id: userId } })
+    const user = await db.user.findUnique({ where: { id: sessionUserId } })
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -116,10 +124,10 @@ export async function POST(req: NextRequest) {
         techStack: JSON.stringify(techStack),
         features: JSON.stringify(features),
         requirements,
-        createdBy: userId,
+        createdBy: sessionUserId,
         members: {
           create: {
-            userId,
+            userId: sessionUserId,
             role: 'leader',
           },
         },
@@ -139,7 +147,7 @@ export async function POST(req: NextRequest) {
     await db.activityLog.create({
       data: {
         projectId: project.id,
-        userId,
+        userId: sessionUserId,
         action: 'project_created',
         description: `Created project "${project.name}"`,
         metadata: JSON.stringify({ projectType, difficulty }),
@@ -158,9 +166,9 @@ export async function POST(req: NextRequest) {
 
       for (const email of teamMembers) {
         const uid = emailToId.get(email)
-        if (uid && uid !== userId) {
+        if (uid && uid !== sessionUserId) {
           membersToCreate.push({ projectId: project.id, userId: uid, role: 'member' })
-        } else if (uid !== userId) {
+        } else if (uid !== sessionUserId) {
           notFoundEmails.push(email)
         }
       }

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // ========== GET: List members ==========
 export async function GET(
@@ -8,6 +9,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+
     const { id } = await params
 
     const members = await db.projectMember.findMany({
@@ -41,6 +45,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const body = await req.json()
     const parsed = addMemberSchema.safeParse(body)
@@ -52,7 +60,8 @@ export async function POST(
       )
     }
 
-    const { userId, role } = parsed.data
+    const { userId: bodyUserId, role } = parsed.data
+    const userId = bodyUserId || sessionUserId
 
     // Check project exists
     const project = await db.project.findUnique({ where: { id } })
@@ -141,9 +150,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
     const { id } = await params
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || sessionUserId
 
     if (!userId) {
       return NextResponse.json(
