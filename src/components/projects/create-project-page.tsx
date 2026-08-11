@@ -35,13 +35,13 @@ const createProjectSchema = z.object({
   name: z.string().min(1, 'Project name is required'),
   description: z.string().min(1, 'Description is required'),
   projectType: z.string().min(1, 'Project type is required'),
-  targetUsers: z.string().optional().default(''),
-  goal: z.string().optional().default(''),
-  deadline: z.string().optional().default(''),
-  difficulty: z.string().optional().default('medium'),
-  techStack: z.array(z.string()).optional().default([]),
-  features: z.array(z.string()).optional().default([]),
-  requirements: z.string().optional().default(''),
+  targetUsers: z.string(),
+  goal: z.string(),
+  deadline: z.string(),
+  difficulty: z.string(),
+  techStack: z.array(z.string()),
+  features: z.array(z.string()),
+  requirements: z.string(),
 })
 
 type ProjectForm = z.infer<typeof createProjectSchema>

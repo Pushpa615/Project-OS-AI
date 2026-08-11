@@ -17,11 +17,6 @@ export async function GET(req: NextRequest) {
 
     const portfolios = await db.portfolio.findMany({
       where: { userId },
-      include: {
-        project: {
-          select: { id: true, name: true, description: true },
-        },
-      },
       orderBy: { updatedAt: 'desc' },
     })
 

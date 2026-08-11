@@ -164,21 +164,21 @@ export async function POST(req: NextRequest) {
       const report = await db.projectReport.create({
         data: {
           projectId,
-          summary: reportData.summary || '',
-          strengths: JSON.stringify(reportData.strengths || []),
-          weaknesses: JSON.stringify(reportData.weaknesses || []),
-          challenges: JSON.stringify(reportData.challenges || []),
-          improvements: JSON.stringify(reportData.improvements || []),
-          recommendedSkills: JSON.stringify(reportData.recommendedSkills || []),
-          futureImprovements: reportData.futureImprovements || '',
-          overallAssessment: reportData.overallAssessment || '',
+          summary: (reportData.summary as string) || '',
+          strengths: JSON.stringify((reportData.strengths as string[]) || []),
+          weaknesses: JSON.stringify((reportData.weaknesses as string[]) || []),
+          challenges: JSON.stringify((reportData.challenges as string[]) || []),
+          improvements: JSON.stringify((reportData.improvements as string[]) || []),
+          recommendedSkills: JSON.stringify((reportData.recommendedSkills as string[]) || []),
+          futureImprovements: (reportData.futureImprovements as string) || '',
+          overallAssessment: (reportData.overallAssessment as string) || '',
           taskCompletion: JSON.stringify(taskStats),
           teamContribution: JSON.stringify(teamContributions),
         },
       })
 
       // Create AI feedback for each team member
-      const individualFeedback = reportData.individualFeedback || []
+      const individualFeedback = (reportData.individualFeedback as Array<Record<string, string>>) || []
       for (const feedback of individualFeedback) {
         const member = project.members.find(
           (m) => m.user.name === feedback.name || m.user.email === feedback.name

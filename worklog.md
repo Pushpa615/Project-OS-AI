@@ -138,3 +138,69 @@ Stage Summary:
 - Complete SPA with 17+ pages routed via Zustand
 - Authentication with proper error handling
 - Browser-verified login, signup, onboarding, and dashboard rendering
+
+---
+Task ID: 2-a
+Agent: main
+Task: Fix TypeScript errors in auth.ts and page.tsx
+Work Log:
+- Fixed auth.ts: moved callbacks from nested session object to top level of authOptions
+- Fixed page.tsx: added null guard (`if (!user) return null`) at top of renderPage()
+- Verified both files compile without their targeted TS errors
+Stage Summary:
+- auth.ts now has correct NextAuth v4 session/callbacks structure (callbacks is sibling to session, not nested)
+- page.tsx renderPage() now safely handles user null check, eliminating AppUser | null type errors
+
+---
+Task ID: 2-b
+Agent: main
+Task: Fix TypeScript errors in 4 API route files
+
+Work Log:
+- Fixed analytics/route.ts: typed teamStats array explicitly to resolve `never[]` inference
+- Fixed portfolio/route.ts: removed non-existent `project` relation include from Portfolio findMany query
+- Fixed generate-plan/route.ts: typed createdMilestones and createdTasks arrays explicitly to resolve `never[]` inference
+- Fixed reports/route.ts: added type assertions for reportData properties (strengths, weaknesses, challenges, improvements, recommendedSkills as string[], summary/futureImprovements/overallAssessment as string, individualFeedback as Array<Record<string, string>>)
+
+Stage Summary:
+- All 4 API route files now compile without TypeScript errors
+- Used explicit typing for arrays inferred as `never[]` and type assertions for `Record<string, unknown>` property access
+
+---
+Task ID: 2-c
+Agent: main
+Task: Fix Zod v4/react-hook-form type errors and missing lucide icon
+
+Work Log:
+- Fixed onboarding-page.tsx: changed `z.string().optional().default('')` to `z.string()` for phone and bio fields
+- Fixed create-project-page.tsx: changed all `.optional().default(...)` fields to plain `z.string()` / `z.array(z.string())` for consistent input/output types
+- Fixed task-detail-page.tsx: replaced non-existent `Screenshot` import from lucide-react with `Camera`
+
+Stage Summary:
+- All 3 component files now compile without TypeScript errors
+- Zod schemas use plain `z.string()` without `.optional()` or `.default()` for form fields where react-hook-form provides defaults via `defaultValues`
+- This eliminates the input/output type mismatch that caused `zodResolver` incompatibility with `useForm` generics
+
+---
+Task ID: 3
+Agent: main
+Task: Fix auth.ts type cast, configure allowedDevOrigins, verify full API flow
+
+Work Log:
+- Fixed auth.ts line 36: changed `(user as Record<string, unknown>).role` to `(user as unknown as Record<string, string>).role` to fix TS2352
+- Fixed auth.ts indentation: corrected session callback closing brace alignment
+- Added `allowedDevOrigins: ["21.0.7.5"]` to next.config.ts to suppress cross-origin warning
+- Ran comprehensive API flow test via curl:
+  1. POST /api/auth/register → 201, user created with profile and notification prefs
+  2. POST /api/onboarding → 200, profile updated, onboarded=true
+  3. POST /api/projects → 201, project created with creator as leader
+  4. GET /api/projects?userId=... → 200, returns 1 project
+  5. GET /api/tasks?projectId=... → 200, returns 0 tasks (expected)
+  6. GET /api/notifications?userId=... → 200, returns 0 notifications (expected)
+- Verified homepage renders with loading spinner and proper metadata
+- Verified session endpoint returns `{}` for unauthenticated users
+
+Stage Summary:
+- Zero TypeScript errors in src/ directory (only unrelated skill file error remains)
+- All core API routes functional: register, onboarding, projects CRUD, tasks, notifications
+- Dev server stable and serving requests correctly

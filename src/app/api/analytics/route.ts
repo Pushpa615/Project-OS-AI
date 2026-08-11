@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
 
     // Calculate team contribution stats
     const memberIds = project.members.map((m) => m.userId)
-    const teamStats = []
+    const teamStats: Array<{userId: string; name: string; role: string; avatar: string | null; totalTasks: number; completedTasks: number; inProgressTasks: number; overdueTasks: number; totalHours: number; estimatedHours: number; checkinCount: number; contributionScore: number}> = []
 
     for (const memberId of memberIds) {
       const memberTasks = tasks.filter((t) => t.assignedTo === memberId)

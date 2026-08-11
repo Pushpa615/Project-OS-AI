@@ -28,21 +28,21 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    callbacks: {
-      async jwt({ token, user }) {
-        if (user) {
-          token.id = user.id
-          token.role = (user as Record<string, unknown>).role
-        }
-        return token
-      },
-      async session({ session, token }) {
-        if (session.user) {
-          (session.user as Record<string, unknown>).id = token.id
-          ;(session.user as Record<string, unknown>).role = token.role
-        }
-        return session
-      },
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.role = (user as unknown as Record<string, string>).role
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as Record<string, unknown>).id = token.id
+        ;(session.user as Record<string, unknown>).role = token.role
+      }
+      return session
     },
   },
   pages: {

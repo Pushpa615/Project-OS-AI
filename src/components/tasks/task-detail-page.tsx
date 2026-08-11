@@ -10,7 +10,7 @@ import {
   Send,
   Link2,
   FileText,
-  Screenshot,
+  Camera,
   GitBranch,
   MessageSquare,
   Image as ImageIcon,

@@ -94,8 +94,8 @@ const personalInfoSchema = z.object({
   college: z.string().min(1, 'College is required'),
   course: z.string().min(1, 'Course is required'),
   academicYear: z.string().min(1, 'Academic year is required'),
-  phone: z.string().optional().default(''),
-  bio: z.string().optional().default(''),
+  phone: z.string(),
+  bio: z.string(),
 })
 
 // ==================== COMPONENTS ====================

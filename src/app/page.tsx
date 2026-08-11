@@ -112,6 +112,7 @@ export default function Home() {
 
   // Render page content
   function renderPage() {
+    if (!user) return null
     switch (page) {
       case 'dashboard': return <DashboardPage user={user} />
       case 'projects': return <ProjectsPage userId={user.id} />
