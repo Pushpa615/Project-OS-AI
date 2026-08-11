@@ -1,0 +1,828 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import {
+     5→  Briefcase,
+     6→  Plus,
+     7→  Eye,
+     8→  Globe,
+     9→  Lock,
+    10→  ExternalLink,
+    11→  X,
+    12→  Loader2,
+    13→  Sparkles,
+    14→  Github,
+    15→  Link as LinkIcon,
+    16→  Pencil,
+    17→  Trash2,
+    18→} from 'lucide-react'
+    19→import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+    20→import { Button } from '@/components/ui/button'
+    21→import { Badge } from '@/components/ui/badge'
+    22→import { Input } from '@/components/ui/input'
+    23→import { Label } from '@/components/ui/label'
+    24→import { Textarea } from '@/components/ui/textarea'
+    25→import { Switch } from '@/components/ui/switch'
+    26→import { Skeleton } from '@/components/ui/skeleton'
+    27→import { Separator } from '@/components/ui/separator'
+    28→import {
+    29→  Dialog,
+    30→  DialogContent,
+    31→  DialogDescription,
+    32→  DialogFooter,
+    33→  DialogHeader,
+    34→  DialogTitle,
+    35→  DialogTrigger,
+    36→} from '@/components/ui/dialog'
+    37→import {
+    38→  AlertDialog,
+    39→  AlertDialogAction,
+    40→  AlertDialogCancel,
+    41→  AlertDialogContent,
+    42→  AlertDialogDescription,
+    43→  AlertDialogFooter,
+    44→  AlertDialogHeader,
+    45→  AlertDialogTitle,
+    46→} from '@/components/ui/alert-dialog'
+    47→import {
+    48→  Select,
+    49→  SelectContent,
+    50→  SelectItem,
+    51→  SelectTrigger,
+    52→  SelectValue,
+    53→} from '@/components/ui/select'
+    54→import { useNavStore } from '@/lib/nav-store'
+    55→
+    56→// ==================== TYPES ====================
+    57→
+    58→interface Project {
+    59→  id: string
+    60→  name: string
+    61→}
+    62→
+    63→interface PortfolioItem {
+    64→  id: string
+    65→  projectId: string | null
+    66→  title: string
+    67→  description: string | null
+    68→  technologies: string
+    69→  contribution: string | null
+    70→  githubUrl: string | null
+    71→  liveUrl: string | null
+    72→  aiSummary: string | null
+    73→  isPublic: boolean
+    74→  createdAt: string
+    75→  updatedAt: string
+    76→}
+    77→
+    78→// ==================== HELPERS ====================
+    79→
+    80→function parseTechnologies(techStr: string): string[] {
+    81→  try {
+    82→    return JSON.parse(techStr)
+    83→  } catch {
+    84→    return techStr.split(',').map((t) => t.trim()).filter(Boolean)
+    85→  }
+    86→}
+    87→
+    88→function formatDate(dateStr: string): string {
+    89→  return new Date(dateStr).toLocaleDateString('en-US', {
+    90→    month: 'short',
+    91→    day: 'numeric',
+    92→    year: 'numeric',
+    93→  })
+    94→}
+    95→
+    96→// ==================== TAG INPUT ====================
+    97→
+    98→function TagInput({ value, onChange, placeholder }: { value: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
+    99→  const [input, setInput] = useState('')
+   100→
+   101→  function addTag() {
+   102→    const tag = input.trim()
+   103→    if (tag && !value.includes(tag)) {
+   104→      onChange([...value, tag])
+   105→    }
+   106→    setInput('')
+   107→  }
+   108→
+   109→  function removeTag(tag: string) {
+   110→    onChange(value.filter((t) => t !== tag))
+   111→  }
+   112→
+   113→  return (
+   114→    <div className="space-y-2">
+   115→      <div className="flex flex-wrap gap-1.5">
+   116→        {value.map((tag) => (
+   117→          <Badge key={tag} variant="secondary" className="text-xs gap-1">
+   118→            {tag}
+   119→            <button
+   120→              type="button"
+   121→              onClick={() => removeTag(tag)}
+   122→              className="ml-0.5 hover:text-destructive"
+   123→            >
+   124→              <X className="h-3 w-3" />
+   125→            </button>
+   126→          </Badge>
+   127→        ))}
+   128→      </div>
+   129→      <div className="flex gap-2">
+   130→        <Input
+   131→          value={input}
+   132→          onChange={(e) => setInput(e.target.value)}
+   133→          onKeyDown={(e) => {
+   134→            if (e.key === 'Enter') {
+   135→              e.preventDefault()
+   136→              addTag()
+   137→            }
+   138→          }}
+   139→          placeholder={placeholder || 'Type and press Enter'}
+   140→          className="flex-1"
+   141→        />
+   142→        <Button type="button" variant="outline" size="sm" onClick={addTag}>
+   143→          Add
+   144→        </Button>
+   145→      </div>
+   146→    </div>
+   147→  )
+   148→}
+   149→
+   150→// ==================== COMPONENT ====================
+   151→
+   152→export function PortfolioPage({ userId }: { userId: string }) {
+   153→  const navigate = useNavStore((s) => s.navigate)
+   154→
+   155→  const [portfolios, setPortfolios] = useState<PortfolioItem[]>([])
+   156→  const [projects, setProjects] = useState<Project[]>([])
+   157→  const [loading, setLoading] = useState(true)
+   158→  const [error, setError] = useState<string | null>(null)
+   159→
+   160→  // Dialog state
+   161→  const [dialogOpen, setDialogOpen] = useState(false)
+   162→  const [saving, setSaving] = useState(false)
+   163→  const [editingId, setEditingId] = useState<string | null>(null)
+   164→  const [form, setForm] = useState({
+   165→    projectId: '',
+   166→    title: '',
+   167→    description: '',
+   168→    technologies: [] as string[],
+   169→    contribution: '',
+   170→    githubUrl: '',
+   171→    liveUrl: '',
+   172→    isPublic: false,
+   173→  })
+   174→
+   175→  // Detail view state
+   176→  const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioItem | null>(null)
+   177→
+   178→  // Delete dialog state
+   179→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+   180→  const [deleting, setDeleting] = useState(false)
+   181→
+   182→  // Fetch portfolios and projects
+   183→  const fetchPortfolios = useCallback(async () => {
+   184→    try {
+   185→      const portRes = await fetch(`/api/portfolio?userId=${userId}`)
+   186→      const portJson = await portRes.json()
+   187→      if (portJson.data) {
+   188→        setPortfolios(Array.isArray(portJson.data) ? portJson.data : [portJson.data])
+   189→      }
+   190→    } catch {
+   191→      // silently fail on refresh
+   192→    }
+   193→  }, [userId])
+   194→
+   195→  useEffect(() => {
+   196→    async function fetchData() {
+   197→      setLoading(true)
+   198→      try {
+   199→        const [portRes, projRes] = await Promise.all([
+   200→          fetch(`/api/portfolio?userId=${userId}`),
+   201→          fetch(`/api/projects?userId=${userId}`),
+   202→        ])
+   203→        const portJson = await portRes.json()
+   204→        if (portJson.data) {
+   205→          setPortfolios(Array.isArray(portJson.data) ? portJson.data : [portJson.data])
+   206→        }
+   207→        const projJson = await projRes.json()
+   208→        if (projJson.data) {
+   209→          setProjects(projJson.data.map((p: Project) => ({ id: p.id, name: p.name })))
+   210→        }
+   211→      } catch {
+   212→        setError('Failed to load data')
+   213→      } finally {
+   214→        setLoading(false)
+   215→      }
+   216→    }
+   217→    fetchData()
+   218→  }, [userId])
+   219→
+   220→  // Create or Update portfolio
+   221→  async function handleSubmit() {
+   222→    if (!form.title.trim()) return
+   223→    setSaving(true)
+   224→    setError(null)
+   225→    try {
+   226→      const isEditing = !!editingId
+   227→      const method = isEditing ? 'PUT' : 'POST'
+   228→      const body: Record<string, unknown> = {
+   229→        userId,
+   230→        projectId: form.projectId || null,
+   231→        title: form.title,
+   232→        description: form.description || null,
+   233→        technologies: JSON.stringify(form.technologies),
+   234→        contribution: form.contribution || null,
+   235→        githubUrl: form.githubUrl || null,
+   236→        liveUrl: form.liveUrl || null,
+   237→        isPublic: form.isPublic,
+   238→      }
+   239→      if (isEditing) {
+   240→        body.id = editingId
+   241→      }
+   242→
+   243→      const res = await fetch('/api/portfolio', {
+   244→        method,
+   245→        headers: { 'Content-Type': 'application/json' },
+   246→        body: JSON.stringify(body),
+   247→      })
+   248→      const json = await res.json()
+   249→      if (json.error) {
+   250→        setError(json.error)
+   251→      } else {
+   252→        setDialogOpen(false)
+   253→        resetForm()
+   254→        setEditingId(null)
+   255→        // Refresh portfolios
+   256→        await fetchPortfolios()
+   257→        // If we were editing and viewing the same item, update the selected portfolio
+   258→        if (isEditing && selectedPortfolio) {
+   259→          const updated = portfolios.find((p) => p.id === editingId)
+   260→          if (updated) {
+   261→            setSelectedPortfolio({
+   262→              ...updated,
+   263→              title: form.title,
+   264→              description: form.description || null,
+   265→              technologies: JSON.stringify(form.technologies),
+   266→              contribution: form.contribution || null,
+   267→              githubUrl: form.githubUrl || null,
+   268→              liveUrl: form.liveUrl || null,
+   269→              isPublic: form.isPublic,
+   270→            })
+   271→          }
+   272→        }
+   273→      }
+   274→    } catch {
+   275→      setError(editingId ? 'Failed to update portfolio' : 'Failed to create portfolio')
+   276→    } finally {
+   277→      setSaving(false)
+   278→    }
+   279→  }
+   280→
+   281→  // Open edit dialog pre-populated with item data
+   282→  function handleEdit(item: PortfolioItem) {
+   283→    setEditingId(item.id)
+   284→    setForm({
+   285→      projectId: item.projectId || '',
+   286→      title: item.title,
+   287→      description: item.description || '',
+   288→      technologies: parseTechnologies(item.technologies),
+   289→      contribution: item.contribution || '',
+   290→      githubUrl: item.githubUrl || '',
+   291→      liveUrl: item.liveUrl || '',
+   292→      isPublic: item.isPublic,
+   293→    })
+   294→    setDialogOpen(true)
+   295→  }
+   296→
+   297→  // Delete portfolio
+   298→  async function handleDelete() {
+   299→    if (!selectedPortfolio) return
+   300→    setDeleting(true)
+   301→    setError(null)
+   302→    try {
+   303→      const res = await fetch(`/api/portfolio?id=${selectedPortfolio.id}&userId=${userId}`, {
+   304→        method: 'DELETE',
+   305→      })
+   306→      const json = await res.json()
+   307→      if (json.error) {
+   308→        setError(json.error)
+   309→      } else {
+   310→        setDeleteDialogOpen(false)
+   311→        setSelectedPortfolio(null)
+   312→        await fetchPortfolios()
+   313→      }
+   314→    } catch {
+   315→      setError('Failed to delete portfolio')
+   316→    } finally {
+   317→      setDeleting(false)
+   318→    }
+   319→  }
+   320→
+   321→  function resetForm() {
+   322→    setForm({
+   323→      projectId: '',
+   324→      title: '',
+   325→      description: '',
+   326→      technologies: [],
+   327→      contribution: '',
+   328→      githubUrl: '',
+   329→      liveUrl: '',
+   330→      isPublic: false,
+   331→    })
+   332→  }
+   333→
+   334→  function handleDialogOpenChange(open: boolean) {
+   335→    setDialogOpen(open)
+   336→    if (!open) {
+   337→      resetForm()
+   338→      setEditingId(null)
+   339→    }
+   340→  }
+   341→
+   342→  // ==================== DETAIL VIEW ====================
+   343→
+   344→  if (selectedPortfolio) {
+   345→    const techs = parseTechnologies(selectedPortfolio.technologies)
+   346→    return (
+   347→      <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   348→        <button
+   349→          onClick={() => setSelectedPortfolio(null)}
+   350→          className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+   351→        >
+   352→          ← Back to Portfolio
+   353→        </button>
+   354→
+   355→        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+   356→          <div>
+   357→            <h1 className="text-2xl font-bold flex items-center gap-2">
+   358→              <Briefcase className="h-6 w-6 text-primary" />
+   359→              {selectedPortfolio.title}
+   360→            </h1>
+   361→            <div className="flex items-center gap-2 mt-2">
+   362→              {selectedPortfolio.isPublic ? (
+   363→                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+   364→                  <Globe className="h-3 w-3 mr-1" /> Public
+   365→                </Badge>
+   366→              ) : (
+   367→                <Badge variant="secondary">
+   368→                  <Lock className="h-3 w-3 mr-1" /> Private
+   369→                </Badge>
+   370→              )}
+   371→              <span className="text-xs text-muted-foreground">
+   372→                Updated {formatDate(selectedPortfolio.updatedAt)}
+   373→              </span>
+   374→            </div>
+   375→          </div>
+   376→          <div className="flex items-center gap-2 flex-wrap">
+   377→            {selectedPortfolio.githubUrl && (
+   378→              <a href={selectedPortfolio.githubUrl} target="_blank" rel="noopener noreferrer">
+   379→                <Button variant="outline" size="sm">
+   380→                  <Github className="h-3.5 w-3.5 mr-1.5" /> GitHub
+   381→                </Button>
+   382→              </a>
+   383→            )}
+   384→            {selectedPortfolio.liveUrl && (
+   385→              <a href={selectedPortfolio.liveUrl} target="_blank" rel="noopener noreferrer">
+   386→                <Button variant="outline" size="sm">
+   387→                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Live Demo
+   388→                </Button>
+   389→              </a>
+   390→            )}
+   391→            <Button variant="outline" size="sm" onClick={() => handleEdit(selectedPortfolio)}>
+   392→              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+   393→            </Button>
+   394→            <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
+   395→              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+   396→            </Button>
+   397→          </div>
+   398→        </div>
+   399→
+   400→        {techs.length > 0 && (
+   401→          <div className="flex flex-wrap gap-1.5">
+   402→            {techs.map((tech) => (
+   403→              <Badge key={tech} variant="secondary" className="text-xs">
+   404→                {tech}
+   405→              </Badge>
+   406→            ))}
+   407→          </div>
+   408→        )}
+   409→
+   410→        {selectedPortfolio.description && (
+   411→          <Card>
+   412→            <CardHeader className="pb-2">
+   413→              <CardTitle className="text-sm font-semibold">Description</CardTitle>
+   414→            </CardHeader>
+   415→            <CardContent>
+   416→              <p className="text-sm text-muted-foreground whitespace-pre-line">
+   417→                {selectedPortfolio.description}
+   418→              </p>
+   419→            </CardContent>
+   420→          </Card>
+   421→        )}
+   422→
+   423→        {selectedPortfolio.contribution && (
+   424→          <Card>
+   425→            <CardHeader className="pb-2">
+   426→              <CardTitle className="text-sm font-semibold">My Contribution</CardTitle>
+   427→            </CardHeader>
+   428→            <CardContent>
+   429→              <p className="text-sm text-muted-foreground whitespace-pre-line">
+   430→                {selectedPortfolio.contribution}
+   431→              </p>
+   432→            </CardContent>
+   433→          </Card>
+   434→        )}
+   435→
+   436→        {selectedPortfolio.aiSummary && (
+   437→          <Card className="border-primary/20">
+   438→            <CardHeader className="pb-2">
+   439→              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   440→                <Sparkles className="h-4 w-4 text-primary" /> AI Summary
+   441→              </CardTitle>
+   442→            </CardHeader>
+   443→            <CardContent>
+   444→              <p className="text-sm text-muted-foreground whitespace-pre-line">
+   445→                {selectedPortfolio.aiSummary}
+   446→              </p>
+   447→            </CardContent>
+   448→          </Card>
+   449→        )}
+   450→
+   451→        {/* Delete Confirmation Dialog */}
+   452→        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+   453→          <AlertDialogContent>
+   454→            <AlertDialogHeader>
+   455→              <AlertDialogTitle>Delete Portfolio Item</AlertDialogTitle>
+   456→              <AlertDialogDescription>
+   457→                Are you sure you want to delete this portfolio item? This action cannot be undone.
+   458→              </AlertDialogDescription>
+   459→            </AlertDialogHeader>
+   460→            <AlertDialogFooter>
+   461→              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+   462→              <AlertDialogAction
+   463→                onClick={handleDelete}
+   464→                disabled={deleting}
+   465→                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+   466→              >
+   467→                {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+   468→                Delete
+   469→              </AlertDialogAction>
+   470→            </AlertDialogFooter>
+   471→          </AlertDialogContent>
+   472→        </AlertDialog>
+   473→
+   474→        {/* Edit Dialog */}
+   475→        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+   476→          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+   477→            <DialogHeader>
+   478→              <DialogTitle>Edit Portfolio Item</DialogTitle>
+   479→              <DialogDescription>
+   480→                Update your portfolio entry details
+   481→              </DialogDescription>
+   482→            </DialogHeader>
+   483→            <div className="space-y-4 py-2">
+   484→              <div className="space-y-2">
+   485→                <Label>Project</Label>
+   486→                <Select
+   487→                  value={form.projectId}
+   488→                  onValueChange={(v) => setForm({ ...form, projectId: v })}
+   489→                >
+   490→                  <SelectTrigger>
+   491→                    <SelectValue placeholder="Select a project (optional)" />
+   492→                  </SelectTrigger>
+   493→                  <SelectContent>
+   494→                    {projects.map((p) => (
+   495→                      <SelectItem key={p.id} value={p.id}>
+   496→                        {p.name}
+   497→                      </SelectItem>
+   498→                    ))}
+   499→                  </SelectContent>
+   500→                </Select>
+   501→              </div>
+   502→              <div className="space-y-2">
+   503→                <Label htmlFor="port-title">Title *</Label>
+   504→                <Input
+   505→                  id="port-title"
+   506→                  value={form.title}
+   507→                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+   508→                  placeholder="e.g. E-Commerce Platform"
+   509→                />
+   510→              </div>
+   511→              <div className="space-y-2">
+   512→                <Label htmlFor="port-desc">Description</Label>
+   513→                <Textarea
+   514→                  id="port-desc"
+   515→                  value={form.description}
+   516→                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+   517→                  placeholder="Brief description of the project..."
+   518→                  rows={3}
+   519→                />
+   520→              </div>
+   521→              <div className="space-y-2">
+   522→                <Label>Technologies</Label>
+   523→                <TagInput
+   524→                  value={form.technologies}
+   525→                  onChange={(v) => setForm({ ...form, technologies: v })}
+   526→                  placeholder="e.g. React, Node.js, PostgreSQL"
+   527→                />
+   528→              </div>
+   529→              <div className="space-y-2">
+   530→                <Label htmlFor="port-contribution">Contribution</Label>
+   531→                <Textarea
+   532→                  id="port-contribution"
+   533→                  value={form.contribution}
+   534→                  onChange={(e) => setForm({ ...form, contribution: e.target.value })}
+   535→                  placeholder="Describe your role and contributions..."
+   536→                  rows={3}
+   537→                />
+   538→              </div>
+   539→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   540→                <div className="space-y-2">
+   541→                  <Label htmlFor="port-github">GitHub URL</Label>
+   542→                  <Input
+   543→                    id="port-github"
+   544→                    value={form.githubUrl}
+   545→                    onChange={(e) => setForm({ ...form, githubUrl: e.target.value })}
+   546→                    placeholder="https://github.com/..."
+   547→                  />
+   548→                </div>
+   549→                <div className="space-y-2">
+   550→                  <Label htmlFor="port-live">Live URL</Label>
+   551→                  <Input
+   552→                    id="port-live"
+   553→                    value={form.liveUrl}
+   554→                    onChange={(e) => setForm({ ...form, liveUrl: e.target.value })}
+   555→                    placeholder="https://..."
+   556→                  />
+   557→                </div>
+   558→              </div>
+   559→              <div className="flex items-center justify-between">
+   560→                <div>
+   561→                  <Label>Public Portfolio</Label>
+   562→                  <p className="text-xs text-muted-foreground">Make this entry visible to others</p>
+   563→                </div>
+   564→                <Switch
+   565→                  checked={form.isPublic}
+   566→                  onCheckedChange={(c) => setForm({ ...form, isPublic: c })}
+   567→                />
+   568→              </div>
+   569→            </div>
+   570→            <DialogFooter>
+   571→              <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
+   572→                Cancel
+   573→              </Button>
+   574→              <Button onClick={handleSubmit} disabled={saving || !form.title.trim()}>
+   575→                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Pencil className="h-4 w-4 mr-2" />}
+   576→                Save Changes
+   577→              </Button>
+   578→            </DialogFooter>
+   579→          </DialogContent>
+   580→        </Dialog>
+   581→
+   582→        {/* Error display in detail view */}
+   583→        {error && (
+   584→          <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+   585→            {error}
+   586→          </div>
+   587→        )}
+   588→      </div>
+   589→    )
+   590→  }
+   591→
+   592→  // ==================== LOADING STATE ====================
+   593→
+   594→  if (loading) {
+   595→    return (
+   596→      <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   597→        <Skeleton className="h-8 w-48" />
+   598→        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   599→          {Array.from({ length: 4 }).map((_, i) => (
+   600→            <Skeleton key={i} className="h-52 rounded-xl" />
+   601→          ))}
+   602→        </div>
+   603→      </div>
+   604→    )
+   605→  }
+   606→
+   607→  // ==================== RENDER ====================
+   608→
+   609→  return (
+   610→    <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   611→      {/* Header */}
+   612→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   613→        <div>
+   614→          <h1 className="text-2xl font-bold flex items-center gap-2">
+   615→            <Briefcase className="h-6 w-6 text-primary" />
+   616→            Portfolio
+   617→          </h1>
+   618→          <p className="text-sm text-muted-foreground mt-1">
+   619→            Showcase your projects and achievements
+   620→          </p>
+   621→        </div>
+   622→        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+   623→          <DialogTrigger asChild>
+   624→            <Button>
+   625→              <Plus className="h-4 w-4 mr-2" /> Create Portfolio
+   626→            </Button>
+   627→          </DialogTrigger>
+   628→          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+   629→            <DialogHeader>
+   630→              <DialogTitle>{editingId ? 'Edit Portfolio Item' : 'Create Portfolio Entry'}</DialogTitle>
+   631→              <DialogDescription>
+   632→                {editingId ? 'Update your portfolio entry details' : 'Add a project to your portfolio showcase'}
+   633→              </DialogDescription>
+   634→            </DialogHeader>
+   635→            <div className="space-y-4 py-2">
+   636→              <div className="space-y-2">
+   637→                <Label>Project</Label>
+   638→                <Select
+   639→                  value={form.projectId}
+   640→                  onValueChange={(v) => setForm({ ...form, projectId: v })}
+   641→                >
+   642→                  <SelectTrigger>
+   643→                    <SelectValue placeholder="Select a project (optional)" />
+   644→                  </SelectTrigger>
+   645→                  <SelectContent>
+   646→                    {projects.map((p) => (
+   647→                      <SelectItem key={p.id} value={p.id}>
+   648→                        {p.name}
+   649→                      </SelectItem>
+   650→                    ))}
+   651→                  </SelectContent>
+   652→                </Select>
+   653→              </div>
+   654→              <div className="space-y-2">
+   655→                <Label htmlFor="port-title">Title *</Label>
+   656→                <Input
+   657→                  id="port-title"
+   658→                  value={form.title}
+   659→                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+   660→                  placeholder="e.g. E-Commerce Platform"
+   661→                />
+   662→              </div>
+   663→              <div className="space-y-2">
+   664→                <Label htmlFor="port-desc">Description</Label>
+   665→                <Textarea
+   666→                  id="port-desc"
+   667→                  value={form.description}
+   668→                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+   669→                  placeholder="Brief description of the project..."
+   670→                  rows={3}
+   671→                />
+   672→              </div>
+   673→              <div className="space-y-2">
+   674→                <Label>Technologies</Label>
+   675→                <TagInput
+   676→                  value={form.technologies}
+   677→                  onChange={(v) => setForm({ ...form, technologies: v })}
+   678→                  placeholder="e.g. React, Node.js, PostgreSQL"
+   679→                />
+   680→              </div>
+   681→              <div className="space-y-2">
+   682→                <Label htmlFor="port-contribution">Contribution</Label>
+   683→                <Textarea
+   684→                  id="port-contribution"
+   685→                  value={form.contribution}
+   686→                  onChange={(e) => setForm({ ...form, contribution: e.target.value })}
+   687→                  placeholder="Describe your role and contributions..."
+   688→                  rows={3}
+   689→                />
+   690→              </div>
+   691→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   692→                <div className="space-y-2">
+   693→                  <Label htmlFor="port-github">GitHub URL</Label>
+   694→                  <Input
+   695→                    id="port-github"
+   696→                    value={form.githubUrl}
+   697→                    onChange={(e) => setForm({ ...form, githubUrl: e.target.value })}
+   698→                    placeholder="https://github.com/..."
+   699→                  />
+   700→                </div>
+   701→                <div className="space-y-2">
+   702→                  <Label htmlFor="port-live">Live URL</Label>
+   703→                  <Input
+   704→                    id="port-live"
+   705→                    value={form.liveUrl}
+   706→                    onChange={(e) => setForm({ ...form, liveUrl: e.target.value })}
+   707→                    placeholder="https://..."
+   708→                  />
+   709→                </div>
+   710→              </div>
+   711→              <div className="flex items-center justify-between">
+   712→                <div>
+   713→                  <Label>Public Portfolio</Label>
+   714→                  <p className="text-xs text-muted-foreground">Make this entry visible to others</p>
+   715→                </div>
+   716→                <Switch
+   717→                  checked={form.isPublic}
+   718→                  onCheckedChange={(c) => setForm({ ...form, isPublic: c })}
+   719→                />
+   720→              </div>
+   721→            </div>
+   722→            <DialogFooter>
+   723→              <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
+   724→                Cancel
+   725→              </Button>
+   726→              <Button onClick={handleSubmit} disabled={saving || !form.title.trim()}>
+   727→                {saving ? (
+   728→                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+   729→                ) : editingId ? (
+   730→                  <Pencil className="h-4 w-4 mr-2" />
+   731→                ) : (
+   732→                  <Plus className="h-4 w-4 mr-2" />
+   733→                )}
+   734→                {editingId ? 'Save Changes' : 'Create'}
+   735→              </Button>
+   736→            </DialogFooter>
+   737→          </DialogContent>
+   738→        </Dialog>
+   739→      </div>
+   740→
+   741→      {/* Error */}
+   742→      {error && (
+   743→        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+   744→          {error}
+   745→        </div>
+   746→      )}
+   747→
+   748→      {/* Portfolio Grid */}
+   749→      {portfolios.length > 0 ? (
+   750→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   751→          {portfolios.map((item) => {
+   752→            const techs = parseTechnologies(item.technologies)
+   753→            return (
+   754→              <Card
+   755→                key={item.id}
+   756→                className="cursor-pointer hover:border-primary/30 transition-colors"
+   757→                onClick={() => setSelectedPortfolio(item)}
+   758→              >
+   759→                <CardContent className="p-4">
+   760→                  <div className="flex items-start justify-between mb-2">
+   761→                    <h3 className="font-semibold text-sm truncate pr-2">{item.title}</h3>
+   762→                    {item.isPublic ? (
+   763→                      <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shrink-0">
+   764→                        <Globe className="h-3 w-3 mr-1" /> Public
+   765→                      </Badge>
+   766→                    ) : (
+   767→                      <Badge variant="secondary" className="shrink-0">
+   768→                        <Lock className="h-3 w-3 mr-1" /> Private
+   769→                      </Badge>
+   770→                    )}
+   771→                  </div>
+   772→
+   773→                  {item.description && (
+   774→                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+   775→                      {item.description}
+   776→                    </p>
+   777→                  )}
+   778→
+   779→                  {techs.length > 0 && (
+   780→                    <div className="flex flex-wrap gap-1 mb-3">
+   781→                      {techs.slice(0, 5).map((tech) => (
+   782→                        <Badge key={tech} variant="outline" className="text-[10px] px-1.5 py-0">
+   783→                          {tech}
+   784→                        </Badge>
+   785→                      ))}
+   786→                      {techs.length > 5 && (
+   787→                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+   788→                          +{techs.length - 5}
+   789→                        </Badge>
+   790→                      )}
+   791→                    </div>
+   792→                  )}
+   793→
+   794→                  {item.contribution && (
+   795→                    <p className="text-xs text-muted-foreground line-clamp-1">
+   796→                      <span className="font-medium">Role:</span> {item.contribution}
+   797→                    </p>
+   798→                  )}
+   799→
+   800→                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
+   801→                    <span className="text-[10px] text-muted-foreground">
+   802→                      {formatDate(item.createdAt)}
+   803→                    </span>
+   804→                    <span className="text-xs text-primary flex items-center gap-1">
+   805→                      View <Eye className="h-3 w-3" />
+   806→                    </span>
+   807→                  </div>
+   808→                </CardContent>
+   809→              </Card>
+   810→            )
+   811→          })}
+   812→        </div>
+   813→      ) : (
+   814→        <Card className="text-center p-8">
+   815→          <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
+   816→          <h3 className="font-semibold mb-1">No Portfolio Entries</h3>
+   817→          <p className="text-sm text-muted-foreground mb-4">
+   818→            Create your first portfolio entry to showcase your work.
+   819→          </p>
+   820→          <Button onClick={() => setDialogOpen(true)}>
+   821→            <Plus className="h-4 w-4 mr-2" /> Create Portfolio
+   822→          </Button>
+   823→        </Card>
+   824→      )}
+   825→    </div>
+   826→  )
+   827→}
+   828→

@@ -115,7 +115,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
       if (json.data) {
         const data = Array.isArray(json.data) ? json.data : [json.data]
         setReports(data)
-        if (data.length > 0 && !projectId) {
+        if (data.length > 0) {
           setSelectedReport(data[0])
         }
       }

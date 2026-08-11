@@ -22,6 +22,8 @@ import {
   ExternalLink,
   UserPlus,
   X,
+  Upload,
+  Trash2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { useNavStore } from '@/lib/nav-store'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 
@@ -173,6 +178,13 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
   const [activeTab, setActiveTab] = useState('overview')
   const [memberEmail, setMemberEmail] = useState('')
   const [memberError, setMemberError] = useState<string | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [files, setFiles] = useState<any[]>([])
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [milestoneTasks, setMilestoneTasks] = useState<Record<string, any[]>>({})
 
   // Fetch project data
   useEffect(() => {
@@ -274,6 +286,97 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
     }
   }
 
+  async function handleSaveEdit() {
+    try {
+      setSavingEdit(true)
+      setError(null)
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, name: editName, description: editDescription }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to update project')
+      setProject(json.data)
+      setEditDialogOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update project')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  function openEditDialog() {
+    if (!project) return
+    setEditName(project.name)
+    setEditDescription(project.description)
+    setEditDialogOpen(true)
+  }
+
+  // Fetch files when on files tab
+  useEffect(() => {
+    if (activeTab === 'files') {
+      fetchFiles()
+    }
+  }, [activeTab, projectId])
+
+  async function fetchFiles() {
+    try {
+      const res = await fetch(`/api/files?projectId=${projectId}`)
+      const json = await res.json()
+      if (res.ok) setFiles(json.data || [])
+    } catch { /* ignore */ }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      setUploadingFile(true)
+      const res = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          userId,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to upload file')
+      await fetchFiles()
+      const projRes = await fetch(`/api/projects/${projectId}`)
+      const projJson = await projRes.json()
+      if (projRes.ok) setProject(projJson.data)
+    } catch { /* ignore */ } finally {
+      setUploadingFile(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleFileDelete(fileId: string) {
+    try {
+      const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete file')
+      await fetchFiles()
+      const projRes = await fetch(`/api/projects/${projectId}`)
+      const projJson = await projRes.json()
+      if (projRes.ok) setProject(projJson.data)
+    } catch { /* ignore */ }
+  }
+
+  async function fetchMilestoneTasks(msId: string) {
+    if (milestoneTasks[msId]) return
+    try {
+      const res = await fetch(`/api/tasks?milestoneId=${msId}`)
+      const json = await res.json()
+      if (res.ok) {
+        setMilestoneTasks((prev) => ({ ...prev, [msId]: json.data || [] }))
+      }
+    } catch { /* ignore */ }
+  }
+
   async function handleAddMember() {
     if (!memberEmail.trim()) return
     try {
@@ -372,7 +475,7 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
               </div>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={openEditDialog}>
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </Button>
@@ -727,16 +830,84 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
           </TabsContent>
 
           {/* ==================== FILES TAB ==================== */}
-          <TabsContent value="files">
+          <TabsContent value="files" className="space-y-4">
+            {/* Upload area */}
             <Card>
-              <CardContent className="p-12 text-center">
-                <FolderOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-                <h3 className="text-base font-medium">No Files Yet</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-                  Upload project files, screenshots, and documents to keep everything organized.
-                </p>
+              <CardContent className="p-6">
+                <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm font-medium">Drop files here or click to upload</p>
+                  <p className="text-xs text-muted-foreground mt-1">Supports all file types</p>
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    disabled={uploadingFile}
+                  />
+                  <label htmlFor="file-upload" className="mt-3 inline-block">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 cursor-pointer"
+                      asChild
+                      disabled={uploadingFile}
+                    >
+                      <span>
+                        {uploadingFile ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-3.5 w-3.5" />
+                            Choose File
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  </label>
+                </div>
               </CardContent>
             </Card>
+
+            {/* File list */}
+            {files.length > 0 ? (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {files.map((file) => (
+                  <Card key={file.id}>
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.fileName}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                          <span>{file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}</span>
+                          <span>{new Date(file.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleFileDelete(file.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <FolderOpen className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No files uploaded yet.</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* ==================== AI PLANNER TAB ==================== */}
@@ -787,7 +958,11 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                     <Card key={ms.id}>
                       <CardHeader className="pb-2 cursor-pointer" onClick={() => {
                         const el = document.getElementById(`ms-tasks-${ms.id}`)
-                        if (el) el.classList.toggle('hidden')
+                        if (el) {
+                          const isHidden = el.classList.contains('hidden')
+                          el.classList.toggle('hidden')
+                          if (isHidden) fetchMilestoneTasks(ms.id)
+                        }
                       }}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -813,9 +988,38 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                       </CardHeader>
                       <CardContent id={`ms-tasks-${ms.id}`} className="hidden pt-0">
                         <Separator className="mb-3" />
-                        <p className="text-xs text-muted-foreground mb-3">
-                          Tasks will appear here once loaded from the Tasks page.
-                        </p>
+                        {milestoneTasks[ms.id] && milestoneTasks[ms.id].length > 0 ? (
+                          <div className="space-y-1.5">
+                            {milestoneTasks[ms.id].map((task: any) => (
+                              <div key={task.id} className="flex items-center gap-2 text-sm py-1">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                                    task.status === 'verified_completed'
+                                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                      : task.status === 'in_progress'
+                                        ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                        : task.status === 'overdue'
+                                          ? 'bg-red-100 text-red-700 border-red-200'
+                                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                                  }`}
+                                >
+                                  {task.status.replace(/_/g, ' ')}
+                                </Badge>
+                                <span className="flex-1 truncate">{task.title}</span>
+                                {task.assignee && (
+                                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                    {task.assignee.name || task.assignee.email}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {milestoneTasks[ms.id] ? 'No tasks in this milestone.' : 'Loading tasks...'}
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -963,6 +1167,50 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Project Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>Update the project name and description.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Project name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Project description"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit || !editName.trim()}>
+              {savingEdit ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

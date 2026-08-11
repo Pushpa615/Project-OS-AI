@@ -178,6 +178,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [generatingSummary, setGeneratingSummary] = useState(false)
 
   // Fetch portfolios and projects
   const fetchPortfolios = useCallback(async () => {
@@ -318,6 +319,29 @@ export function PortfolioPage({ userId }: { userId: string }) {
     }
   }
 
+  // Generate AI summary
+  async function handleGenerateSummary() {
+    if (!selectedPortfolio) return
+    setGeneratingSummary(true)
+    try {
+      const res = await fetch('/api/portfolio/generate-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portfolioId: selectedPortfolio.id }),
+      })
+      const json = await res.json()
+      if (json.error) {
+        setError(json.error)
+      } else if (json.data) {
+        setSelectedPortfolio({ ...selectedPortfolio, aiSummary: json.data.aiSummary })
+      }
+    } catch {
+      setError('Failed to generate AI summary')
+    } finally {
+      setGeneratingSummary(false)
+    }
+  }
+
   function resetForm() {
     setForm({
       projectId: '',
@@ -433,7 +457,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
           </Card>
         )}
 
-        {selectedPortfolio.aiSummary && (
+        {selectedPortfolio.aiSummary ? (
           <Card className="border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -444,6 +468,23 @@ export function PortfolioPage({ userId }: { userId: string }) {
               <p className="text-sm text-muted-foreground whitespace-pre-line">
                 {selectedPortfolio.aiSummary}
               </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-dashed">
+            <CardContent className="p-6 text-center space-y-3">
+              <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Generate an AI-powered summary for your portfolio</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateSummary}
+                disabled={generatingSummary}
+                className="gap-1.5"
+              >
+                {generatingSummary ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {generatingSummary ? 'Generating...' : 'Generate AI Summary'}
+              </Button>
             </CardContent>
           </Card>
         )}

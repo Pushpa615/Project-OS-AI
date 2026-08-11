@@ -246,7 +246,7 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
             </div>
           </div>
           {projectId && (
-            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => document.getElementById('add-member-section')?.scrollIntoView({ behavior: 'smooth' })}>
               <UserPlus className="h-3.5 w-3.5" />
               Add Member
             </Button>
@@ -265,7 +265,7 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
 
         {/* Add member (project context) */}
         {projectId && (
-          <Card>
+          <Card id="add-member-section">
             <CardContent className="p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <div className="relative flex-1">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

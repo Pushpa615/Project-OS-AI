@@ -167,3 +167,99 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// ========== PUT: Update checkin ==========
+export async function PUT(req: NextRequest) {
+  try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
+
+    const body = await req.json()
+    const parsed = checkinSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const {
+      userId: bodyUserId,
+      projectId,
+      date,
+      completed,
+      workingOn,
+      blocked,
+      blockReason,
+      remains,
+      needHelp,
+    } = parsed.data
+
+    const userId = bodyUserId || sessionUserId
+
+    // Check if user exists
+    const user = await db.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    // Get assigned tasks for AI context
+    const assignedTasks = await db.task.findMany({
+      where: { assignedTo: userId, status: { not: 'verified_completed' } },
+      select: { title: true, status: true, dueDate: true },
+      take: 10,
+    })
+
+    // Call AI for updated feedback
+    let aiFeedback: string | null = null
+    try {
+      aiFeedback = await aiAnalyzeCheckin({
+        completed: completed || 'Nothing reported',
+        workingOn: workingOn || 'Nothing reported',
+        blocked,
+        blockReason: blockReason || undefined,
+        remains: remains || undefined,
+        needHelp: needHelp || undefined,
+        assignedTasks: assignedTasks.map((t) => ({
+          title: t.title,
+          status: t.status,
+          dueDate: t.dueDate?.toISOString(),
+        })),
+      })
+    } catch (aiError) {
+      console.error('AI checkin analysis failed:', aiError)
+      aiFeedback = null
+    }
+
+    const checkin = await db.dailyCheckin.update({
+      where: {
+        userId_date: { userId, date },
+      },
+      data: {
+        projectId: projectId || null,
+        completed,
+        workingOn,
+        blocked,
+        blockReason,
+        remains,
+        needHelp,
+        aiFeedback,
+      },
+    })
+
+    return NextResponse.json(
+      { data: checkin, message: 'Checkin updated successfully' }
+    )
+  } catch (error) {
+    console.error('Update checkin error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update checkin' },
+      { status: 500 }
+    )
+  }
+}

@@ -58,6 +58,7 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Form state
   const [completed, setCompleted] = useState('')
@@ -108,13 +109,14 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
     setSubmitting(true)
     setSubmitError(null)
     try {
+      const method = isEditing ? 'PUT' : 'POST'
       const res = await fetch('/api/checkins', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
           projectId: projectId || undefined,
-          date: today,
+          date: isEditing && todayCheckin ? todayCheckin.date : today,
           completed,
           workingOn,
           blocked,
@@ -134,11 +136,12 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
         setBlockReason('')
         setRemains('')
         setNeedHelp('')
+        setIsEditing(false)
         // Refresh
         fetchCheckins()
       }
     } catch {
-      setSubmitError('Failed to submit check-in')
+      setSubmitError(isEditing ? 'Failed to update check-in' : 'Failed to submit check-in')
     } finally {
       setSubmitting(false)
     }
@@ -190,7 +193,7 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            {hasCheckedInToday && todayCheckin ? (
+            {hasCheckedInToday && todayCheckin && !isEditing ? (
               /* Show today's check-in with AI feedback */
               <div className="space-y-4">
                 <CheckinContent checkin={todayCheckin} expanded />
@@ -218,6 +221,7 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
                     setBlockReason(todayCheckin.blockReason || '')
                     setRemains(todayCheckin.remains || '')
                     setNeedHelp(todayCheckin.needHelp || '')
+                    setIsEditing(true)
                   }}
                 >
                   Update Today's Check-in
@@ -310,12 +314,12 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Submitting...
+                      {isEditing ? 'Updating...' : 'Submitting...'}
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-2" />
-                      Submit Check-in
+                      {isEditing ? 'Update Check-in' : 'Submit Check-in'}
                     </>
                   )}
                 </Button>

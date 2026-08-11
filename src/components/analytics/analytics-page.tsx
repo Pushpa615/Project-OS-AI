@@ -49,6 +49,7 @@ interface Project {
   id: string
   name: string
   status: string
+  deadline?: string | null
 }
 
 interface AnalyticsData {
@@ -158,7 +159,12 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
   function getDeadlineRisk(projectId: string): 'low' | 'medium' | 'high' | 'critical' {
     const project = projects.find((p) => p.id === projectId)
     if (!project) return 'low'
-    return 'medium' // simplified
+    if (!project.deadline) return 'low'
+    const daysRemaining = (new Date(project.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    if (daysRemaining < 0) return 'critical'
+    if (daysRemaining <= 3) return 'high'
+    if (daysRemaining <= 7) return 'medium'
+    return 'low'
   }
 
   // ==================== LOADING STATE ====================
