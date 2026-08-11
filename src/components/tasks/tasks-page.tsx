@@ -203,7 +203,7 @@ function DroppableColumn({
 }: {
   column: (typeof COLUMNS)[number]
   tasks: Task[]
-  navigate: ReturnType<typeof useNavStore>['navigate']
+  navigate: (page: Parameters<ReturnType<typeof useNavStore.getState>['navigate']>[0], params?: Record<string, string>) => void
   updatingTaskId: string | null
 }) {
   const { setNodeRef, isOver } = useDroppable({

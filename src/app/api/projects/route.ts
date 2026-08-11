@@ -161,8 +161,8 @@ export async function POST(req: NextRequest) {
         select: { id: true, email: true },
       })
       const emailToId = new Map(existingUsers.map((u) => [u.email, u.id]))
-      const membersToCreate = []
-      const notFoundEmails = []
+      const membersToCreate: { projectId: string; userId: string; role: string }[] = []
+      const notFoundEmails: string[] = []
 
       for (const email of teamMembers) {
         const uid = emailToId.get(email)

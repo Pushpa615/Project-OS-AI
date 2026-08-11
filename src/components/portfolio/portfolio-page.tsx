@@ -272,7 +272,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
         }
       }
     } catch {
-      setError(isEditing ? 'Failed to update portfolio' : 'Failed to create portfolio')
+      setError(editingId ? 'Failed to update portfolio' : 'Failed to create portfolio')
     } finally {
       setSaving(false)
     }

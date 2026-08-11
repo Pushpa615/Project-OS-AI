@@ -26,15 +26,21 @@ export async function GET(req: NextRequest) {
     })
 
     // Fetch individual AI feedback for the project
-    const feedback = await db.aiFeedback.findMany({
+    const feedbackRecords = await db.aiFeedback.findMany({
       where: { projectId, category: 'project_report' },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true },
-        },
-      },
       orderBy: { generatedAt: 'desc' },
     })
+
+    // Enrich with user names
+    const userIds = [...new Set(feedbackRecords.map(f => f.userId))]
+    const users = userIds.length > 0
+      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } })
+      : []
+    const userMap = new Map(users.map(u => [u.id, u]))
+    const feedback = feedbackRecords.map(f => ({
+      ...f,
+      user: userMap.get(f.userId) || null,
+    }))
 
     return NextResponse.json({ data: reports, feedback })
   } catch (error) {

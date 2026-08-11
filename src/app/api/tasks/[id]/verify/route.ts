@@ -168,7 +168,7 @@ export async function POST(
       })
 
       // Notify task assignee
-      if (task.assignedTo && task.assignedTo !== userId) {
+      if (task.assignedTo && task.assignedTo !== sessionUserId) {
         await db.notification.create({
           data: {
             userId: task.assignedTo,
