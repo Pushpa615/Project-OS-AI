@@ -42,7 +42,7 @@ export async function GET(
         taskComments: {
           include: {
             user: {
-              select: { id: true, name: true, avatar: true },
+              select: { id: true, name: true, email: true, avatar: true },
             },
           },
           orderBy: { createdAt: 'asc' },

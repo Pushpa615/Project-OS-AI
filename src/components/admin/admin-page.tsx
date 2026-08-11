@@ -168,9 +168,11 @@ export function AdminPage({ userId }: { userId: string }) {
         const analyticsJson = await analyticsRes.json()
         if (analyticsJson.data) {
           const d = analyticsJson.data
+          const projectCount = projectsResJson.data?.length || 0
+          const userCount = Array.from(userMap.values()).length || 1
           setSystemStats([
-            { label: 'Total Projects', value: projects.length, icon: <FolderOpen className="h-4 w-4" />, color: 'text-emerald-500 bg-emerald-500/10' },
-            { label: 'Total Users', value: users.length || 1, icon: <Users className="h-4 w-4" />, color: 'text-teal-500 bg-teal-500/10' },
+            { label: 'Total Projects', value: projectCount, icon: <FolderOpen className="h-4 w-4" />, color: 'text-emerald-500 bg-emerald-500/10' },
+            { label: 'Total Users', value: userCount, icon: <Users className="h-4 w-4" />, color: 'text-teal-500 bg-teal-500/10' },
             { label: 'Tasks Completed', value: d.taskStats?.completed || 0, icon: <Activity className="h-4 w-4" />, color: 'text-amber-500 bg-amber-500/10' },
             { label: 'AI Requests', value: 0, icon: <Cpu className="h-4 w-4" />, color: 'text-violet-500 bg-violet-500/10' },
             { label: 'Notifications Sent', value: 0, icon: <Bell className="h-4 w-4" />, color: 'text-cyan-500 bg-cyan-500/10' },
@@ -182,7 +184,7 @@ export function AdminPage({ userId }: { userId: string }) {
       }
     }
     fetchData()
-  }, [userRole, userId, projects.length, users.length])
+  }, [userRole, userId])
 
   // Change user role
   async function handleChangeRole(userIdToChange: string, newRole: string) {

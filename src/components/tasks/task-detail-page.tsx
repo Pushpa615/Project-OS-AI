@@ -731,14 +731,14 @@ export function TaskDetailPage({ taskId, userId }: { taskId: string; userId: str
                               <Badge
                                 variant="outline"
                                 className={`text-[10px] shrink-0 ${
-                                  ev.confidence >= 0.7
+                                  ev.confidence >= 70
                                     ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                    : ev.confidence >= 0.4
+                                    : ev.confidence >= 40
                                       ? 'bg-amber-100 text-amber-700 border-amber-200'
                                       : 'bg-red-100 text-red-700 border-red-200'
                                 }`}
                               >
-                                {Math.round(ev.confidence * 100)}% confidence
+                                {Math.round(ev.confidence)}% confidence
                               </Badge>
                             )}
                           </div>

@@ -79,9 +79,21 @@ export default function Home() {
   }, [navigate])
 
   const handleAuthSuccess = useCallback(
-    (userData: AppUser) => {
+    async (userData: AppUser) => {
       setUser(userData)
-      navigate('onboarding')
+      // Check onboarding status before navigating
+      try {
+        const profileRes = await fetch(`/api/onboarding?userId=${userData.id}`)
+        const profileData = await profileRes.json()
+        if (profileData.data?.onboarded) {
+          setOnboarded(true)
+          navigate('dashboard')
+        } else {
+          navigate('onboarding')
+        }
+      } catch {
+        navigate('onboarding')
+      }
     },
     [navigate]
   )

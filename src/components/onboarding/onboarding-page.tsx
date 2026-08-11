@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   Loader2,
   Check,
+  Plus,
   GraduationCap,
   Code,
   Link2,
@@ -400,14 +401,7 @@ function SkillsStep({
   )
 }
 
-// Helper - need Plus import added
-function Plus({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  )
-}
+
 
 // Step 3: Developer Accounts
 function AccountsStep({
