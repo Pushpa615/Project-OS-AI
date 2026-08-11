@@ -79,6 +79,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Determine the task's projectId if not provided
+    let effectiveProjectId = projectId
+    if (!effectiveProjectId && taskId) {
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { projectId: true },
+      })
+      if (task) effectiveProjectId = task.projectId
+    }
+
     // Create comment
     const comment = await db.comment.create({
       data: {
@@ -95,6 +105,11 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Build notification link
+    const notifLink = effectiveProjectId
+      ? (taskId ? `/projects/${effectiveProjectId}/tasks/${taskId}` : `/projects/${effectiveProjectId}`)
+      : (taskId ? `/tasks/${taskId}` : null)
+
     // Notify mentioned users
     if (mentions && mentions.length > 0) {
       for (const mentionId of mentions) {
@@ -106,17 +121,17 @@ export async function POST(req: NextRequest) {
             type: 'comment_mention',
             title: 'You were mentioned in a comment',
             message: `${user.name || user.email} mentioned you in a comment: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`,
-            link: taskId ? `/projects/${projectId}/tasks/${taskId}` : `/projects/${projectId}`,
-            metadata: JSON.stringify({ commentId: comment.id, projectId, taskId }),
+            link: notifLink,
+            metadata: JSON.stringify({ commentId: comment.id, projectId: effectiveProjectId, taskId }),
           },
         })
       }
     }
 
     // Notify project/task members
-    if (projectId) {
+    if (effectiveProjectId) {
       const projectMembers = await db.projectMember.findMany({
-        where: { projectId, userId: { not: userId } },
+        where: { projectId: effectiveProjectId, userId: { not: userId } },
         select: { userId: true },
       })
 
@@ -129,8 +144,8 @@ export async function POST(req: NextRequest) {
             type: 'new_comment',
             title: 'New Comment',
             message: `${user.name || user.email} commented ${taskId ? `on a task` : `on the project`}`,
-            link: taskId ? `/projects/${projectId}/tasks/${taskId}` : `/projects/${projectId}`,
-            metadata: JSON.stringify({ commentId: comment.id, projectId, taskId }),
+            link: notifLink,
+            metadata: JSON.stringify({ commentId: comment.id, projectId: effectiveProjectId, taskId }),
           },
         })
       }

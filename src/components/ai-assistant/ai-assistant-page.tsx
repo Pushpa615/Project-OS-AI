@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavStore } from '@/lib/nav-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -163,9 +163,9 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
     if (deadlineProjectId) fetchOverdue(deadlineProjectId)
   }, [deadlineProjectId, fetchOverdue])
 
-  // AI request helper
+  // AI request helper — accepts explicit projectId/taskId overrides
   const callAI = useCallback(
-    async (type: string, question: string, context: string = '') => {
+    async (type: string, question: string, context: string = '', overrides?: { projectId?: string; taskId?: string }) => {
       setLoading(true)
       setError(null)
       try {
@@ -174,8 +174,8 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
-            projectId: projectId || undefined,
-            taskId: taskId || undefined,
+            projectId: overrides?.projectId || projectId || undefined,
+            taskId: overrides?.taskId || taskId || undefined,
             type,
             question,
             context,
@@ -200,7 +200,7 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
   // Code assistant submit
   const handleCodeSubmit = async () => {
     if (!codeQuestion.trim()) return
-    const response = await callAI('code_help', codeQuestion)
+    const response = await callAI('code_help', codeQuestion, undefined, { projectId: codeProjectId, taskId: codeTaskId || undefined })
     if (response) {
       setCodeHistory((prev) => [
         { question: codeQuestion, response, type: 'code_help', timestamp: new Date().toISOString() },
@@ -221,7 +221,7 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
       .filter(Boolean)
       .join('\n\n')
 
-    const response = await callAI('bug_help', bugErrorMessage, context)
+    const response = await callAI('bug_help', bugErrorMessage, context, { projectId })
     if (response) {
       setBugHistory((prev) => [
         { question: bugErrorMessage, response, type: 'bug_help', timestamp: new Date().toISOString() },
@@ -239,7 +239,7 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
   const handleDocGenerate = async () => {
     if (!docProjectId || !docType) return
     const question = `Generate a ${docType} document for this project. Include all relevant sections, be comprehensive and professional.`
-    const response = await callAI('general', question)
+    const response = await callAI('general', question, undefined, { projectId: docProjectId })
     if (response) {
       setDocResponse(response)
     }
@@ -252,7 +252,7 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
       .map((t) => ` - ${t.title} (${t.status})`)
       .join('\n')
     const question = `Analyze the current project timeline and provide: 1) Timeline status assessment, 2) Overdue task analysis, 3) Risk identification, 4) Specific AI-powered recommendations for getting back on track.\n\nOverdue tasks:\n${overdueInfo || 'None'}`
-    const response = await callAI('general', question)
+    const response = await callAI('general', question, undefined, { projectId: deadlineProjectId })
     if (response) {
       setDeadlineResponse(response)
     }

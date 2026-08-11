@@ -172,6 +172,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const body = await req.json()
+    const parsed = deleteProjectSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const { userId } = parsed.data
 
     // Check project exists
     const project = await db.project.findUnique({ where: { id } })
@@ -186,6 +197,16 @@ export async function DELETE(
     await db.project.update({
       where: { id },
       data: { status: 'archived' },
+    })
+
+    // Log activity
+    await db.activityLog.create({
+      data: {
+        projectId: id,
+        userId,
+        action: 'project_archived',
+        description: `Archived project "${project.name}"`,
+      },
     })
 
     return NextResponse.json({

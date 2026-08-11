@@ -1,0 +1,976 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect } from 'react'
+     4→import {
+     5→  ArrowLeft,
+     6→  Save,
+     7→  Loader2,
+     8→  Plus,
+     9→  Brain,
+    10→  Send,
+    11→  Link2,
+    12→  FileText,
+    13→  Camera,
+    14→  GitBranch,
+    15→  MessageSquare,
+    16→  Image as ImageIcon,
+    17→  AlertCircle,
+    18→  CheckCircle,
+    19→  Clock,
+    20→  User,
+    21→  Calendar,
+    22→  Target,
+    23→  Hourglass,
+    24→  ChevronDown,
+    25→  ChevronRight,
+    26→  Sparkles,
+    27→} from 'lucide-react'
+    28→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    29→import { Button } from '@/components/ui/button'
+    30→import { Badge } from '@/components/ui/badge'
+    31→import { Input } from '@/components/ui/input'
+    32→import { Textarea } from '@/components/ui/textarea'
+    33→import { Label } from '@/components/ui/label'
+    34→import { Progress } from '@/components/ui/progress'
+    35→import { Skeleton } from '@/components/ui/skeleton'
+    36→import { Slider } from '@/components/ui/slider'
+    37→import { Separator } from '@/components/ui/separator'
+    38→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    39→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    40→import {
+    41→  Select,
+    42→  SelectContent,
+    43→  SelectItem,
+    44→  SelectTrigger,
+    45→  SelectValue,
+    46→} from '@/components/ui/select'
+    47→import {
+    48→  Dialog,
+    49→  DialogContent,
+    50→  DialogHeader,
+    51→  DialogTitle,
+    52→  DialogFooter,
+    53→  DialogDescription,
+    54→} from '@/components/ui/dialog'
+    55→import { useNavStore } from '@/lib/nav-store'
+    56→
+    57→// ==================== TYPES ====================
+    58→
+    59→interface TaskDetail {
+    60→  id: string
+    61→  title: string
+    62→  description: string
+    63→  status: string
+    64→  priority: string
+    65→  dueDate: string | null
+    66→  startDate: string | null
+    67→  estimatedHours: number | null
+    68→  actualHours: number | null
+    69→  completionPercent: number
+    70→  evidenceReq: string | null
+    71→  milestoneId: string | null
+    72→  createdAt: string
+    73→  updatedAt: string
+    74→  assignee: { id: string; name: string | null; email: string; avatar: string | null } | null
+    75→  milestone: { id: string; title: string; status: string; progress: number } | null
+    76→  project: { id: string; name: string; techStack: string }
+    77→  dependencies: { dependsOn: { id: string; title: string; status: string; priority: string } }[]
+    78→  dependentTasks: { task: { id: string; title: string; status: string; priority: string } }[]
+    79→  evidence: EvidenceItem[]
+    80→  taskComments: Comment[]
+    81→  aiRequests: { id: string; type: string; status: string; createdAt: string }[]
+    82→}
+    83→
+    84→interface EvidenceItem {
+    85→  id: string
+    86→  type: string
+    87→  title: string
+    88→  description: string
+    89→  url: string | null
+    90→  fileName: string | null
+    91→  confidence: number | null
+    92→  aiAnalysis: string | null
+    93→  createdAt: string
+    94→}
+    95→
+    96→interface Comment {
+    97→  id: string
+    98→  content: string
+    99→  createdAt: string
+   100→  user: { id: string; name: string | null; email: string; avatar: string | null }
+   101→}
+   102→
+   103→// ==================== HELPERS ====================
+   104→
+   105→const statusColors: Record<string, string> = {
+   106→  not_started: 'bg-slate-100 text-slate-700 border-slate-200',
+   107→  in_progress: 'bg-amber-100 text-amber-700 border-amber-200',
+   108→  blocked: 'bg-red-100 text-red-700 border-red-200',
+   109→  submitted: 'bg-violet-100 text-violet-700 border-violet-200',
+   110→  under_review: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+   111→  verified_completed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+   112→  overdue: 'bg-red-100 text-red-600 border-red-200',
+   113→}
+   114→
+   115→const priorityConfig: Record<string, { color: string; label: string }> = {
+   116→  critical: { color: 'bg-red-100 text-red-700 border-red-200', label: 'Critical' },
+   117→  high: { color: 'bg-orange-100 text-orange-700 border-orange-200', label: 'High' },
+   118→  medium: { color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Medium' },
+   119→  low: { color: 'bg-slate-100 text-slate-600 border-slate-200', label: 'Low' },
+   120→}
+   121→
+   122→const evidenceTypeIcons: Record<string, React.ElementType> = {
+   123→  screenshot: ImageIcon,
+   124→  video: FileText,
+   125→  document: FileText,
+   126→  link: Link2,
+   127→  code: GitBranch,
+   128→  other: FileText,
+   129→}
+   130→
+   131→const evidenceTypes = [
+   132→  { value: 'link', label: 'Demo Link' },
+   133→  { value: 'code', label: 'GitHub Commit' },
+   134→  { value: 'screenshot', label: 'Screenshot' },
+   135→  { value: 'document', label: 'Documentation' },
+   136→  { value: 'video', label: 'Video' },
+   137→  { value: 'other', label: 'Other' },
+   138→]
+   139→
+   140→function formatDate(dateStr: string | null): string {
+   141→  if (!dateStr) return 'Not set'
+   142→  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+   143→}
+   144→
+   145→// ==================== MAIN COMPONENT ====================
+   146→
+   147→export function TaskDetailPage({ taskId, userId }: { taskId: string; userId: string }) {
+   148→  const navigate = useNavStore((s) => s.navigate)
+   149→  const [task, setTask] = useState<TaskDetail | null>(null)
+   150→  const [loading, setLoading] = useState(true)
+   151→  const [error, setError] = useState<string | null>(null)
+   152→  const [activeTab, setActiveTab] = useState('details')
+   153→  const [saving, setSaving] = useState(false)
+   154→  const [saveError, setSaveError] = useState<string | null>(null)
+   155→  const [saveSuccess, setSaveSuccess] = useState(false)
+   156→  const [comments, setComments] = useState<Comment[]>([])
+   157→  const [commentInput, setCommentInput] = useState('')
+   158→  const [submittingComment, setSubmittingComment] = useState(false)
+   159→
+   160→  // AI Help state
+   161→  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+   162→  const [aiQuestion, setAiQuestion] = useState('')
+   163→  const [aiLoading, setAiLoading] = useState(false)
+   164→
+   165→  // Evidence dialog state
+   166→  const [evidenceOpen, setEvidenceOpen] = useState(false)
+   167→  const [evidenceType, setEvidenceType] = useState('link')
+   168→  const [evidenceTitle, setEvidenceTitle] = useState('')
+   169→  const [evidenceDesc, setEvidenceDesc] = useState('')
+   170→  const [evidenceUrl, setEvidenceUrl] = useState('')
+   171→  const [evidenceSaving, setEvidenceSaving] = useState(false)
+   172→
+   173→  // Verifying state
+   174→  const [verifying, setVerifying] = useState(false)
+   175→
+   176→  // Editable fields
+   177→  const [editStatus, setEditStatus] = useState('')
+   178→  const [editCompletion, setEditCompletion] = useState(0)
+   179→  const [editHours, setEditHours] = useState('')
+   180→  const [editEstimated, setEditEstimated] = useState('')
+   181→  const [depsExpanded, setDepsExpanded] = useState(true)
+   182→  const [depOfExpanded, setDepOfExpanded] = useState(true)
+   183→
+   184→  // Fetch task
+   185→  useEffect(() => {
+   186→    async function fetchTask() {
+   187→      try {
+   188→        setLoading(true)
+   189→        const res = await fetch(`/api/tasks/${taskId}`)
+   190→        const json = await res.json()
+   191→        if (!res.ok) throw new Error(json.error || 'Failed to fetch task')
+   192→        const t = json.data
+   193→        setTask(t)
+   194→        setEditStatus(t.status)
+   195→        setEditCompletion(t.completionPercent)
+   196→        setEditHours(t.actualHours?.toString() || '')
+   197→        setEditEstimated(t.estimatedHours?.toString() || '')
+   198→        setComments(t.taskComments || [])
+   199→      } catch (err) {
+   200→        setError(err instanceof Error ? err.message : 'Something went wrong')
+   201→      } finally {
+   202→        setLoading(false)
+   203→      }
+   204→    }
+   205→    fetchTask()
+   206→  }, [taskId])
+   207→
+   208→  // Save task details
+   209→  async function handleSave() {
+   210→    try {
+   211→      setSaving(true)
+   212→      setSaveError(null)
+   213→      setSaveSuccess(false)
+   214→      const body: Record<string, unknown> = {
+   215→        userId,
+   216→        status: editStatus,
+   217→        completionPercent: editCompletion,
+   218→        actualHours: editHours ? parseFloat(editHours) : null,
+   219→        estimatedHours: editEstimated ? parseFloat(editEstimated) : null,
+   220→      }
+   221→      const res = await fetch(`/api/tasks/${taskId}`, {
+   222→        method: 'PUT',
+   223→        headers: { 'Content-Type': 'application/json' },
+   224→        body: JSON.stringify(body),
+   225→      })
+   226→      const json = await res.json()
+   227→      if (!res.ok) throw new Error(json.error || 'Failed to update task')
+   228→      setSaveSuccess(true)
+   229→      setTimeout(() => setSaveSuccess(false), 3000)
+   230→      // Re-fetch
+   231→      const taskRes = await fetch(`/api/tasks/${taskId}`)
+   232→      const taskJson = await taskRes.json()
+   233→      if (taskRes.ok) setTask(taskJson.data)
+   234→    } catch (err) {
+   235→      setSaveError(err instanceof Error ? err.message : 'Failed to save')
+   236→    } finally {
+   237→      setSaving(false)
+   238→    }
+   239→  }
+   240→
+   241→  // Add evidence
+   242→  async function handleAddEvidence() {
+   243→    try {
+   244→      setEvidenceSaving(true)
+   245→      const body = {
+   246→        type: evidenceType,
+   247→        title: evidenceTitle,
+   248→        description: evidenceDesc,
+   249→        url: evidenceUrl,
+   250→      }
+   251→      const res = await fetch(`/api/tasks/${taskId}/evidence`, {
+   252→        method: 'POST',
+   253→        headers: { 'Content-Type': 'application/json' },
+   254→        body: JSON.stringify(body),
+   255→      })
+   256→      const json = await res.json()
+   257→      if (!res.ok) throw new Error(json.error || 'Failed to add evidence')
+   258→      setEvidenceOpen(false)
+   259→      setEvidenceTitle('')
+   260→      setEvidenceDesc('')
+   261→      setEvidenceUrl('')
+   262→      setEvidenceType('link')
+   263→      // Re-fetch
+   264→      const taskRes = await fetch(`/api/tasks/${taskId}`)
+   265→      const taskJson = await taskRes.json()
+   266→      if (taskRes.ok) setTask(taskJson.data)
+   267→    } catch (err) {
+   268→      setError(err instanceof Error ? err.message : 'Failed to add evidence')
+   269→    } finally {
+   270→      setEvidenceSaving(false)
+   271→    }
+   272→  }
+   273→
+   274→  // Verify with AI
+   275→  async function handleVerify() {
+   276→    try {
+   277→      setVerifying(true)
+   278→      const res = await fetch(`/api/tasks/${taskId}/verify`, {
+   279→        method: 'POST',
+   280→        headers: { 'Content-Type': 'application/json' },
+   281→        body: JSON.stringify({ userId }),
+   282→      })
+   283→      const json = await res.json()
+   284→      if (!res.ok) throw new Error(json.error || 'Verification failed')
+   285→      // Re-fetch task
+   286→      const taskRes = await fetch(`/api/tasks/${taskId}`)
+   287→      const taskJson = await taskRes.json()
+   288→      if (taskRes.ok) setTask(taskJson.data)
+   289→    } catch (err) {
+   290→      setError(err instanceof Error ? err.message : 'Verification failed')
+   291→    } finally {
+   292→      setVerifying(false)
+   293→    }
+   294→  }
+   295→
+   296→  // Add comment
+   297→  async function handleAddComment() {
+   298→    if (!commentInput.trim()) return
+   299→    try {
+   300→      setSubmittingComment(true)
+   301→      const res = await fetch('/api/comments', {
+   302→        method: 'POST',
+   303→        headers: { 'Content-Type': 'application/json' },
+   304→        body: JSON.stringify({
+   305→          userId,
+   306→          taskId,
+   307→          content: commentInput.trim(),
+   308→        }),
+   309→      })
+   310→      const json = await res.json()
+   311→      if (!res.ok) throw new Error(json.error || 'Failed to add comment')
+   312→      setCommentInput('')
+   313→      const newComment = json.data
+   314→      setComments((prev) => [...prev, newComment])
+   315→    } catch (err) {
+   316→      setError(err instanceof Error ? err.message : 'Failed to add comment')
+   317→    } finally {
+   318→      setSubmittingComment(false)
+   319→    }
+   320→  }
+   321→
+   322→  // AI Chat
+   323→  async function handleAiChat() {
+   324→    if (!aiQuestion.trim()) return
+   325→    const question = aiQuestion.trim()
+   326→    setAiQuestion('')
+   327→    setAiMessages((prev) => [...prev, { role: 'user', content: question }])
+   328→    setAiLoading(true)
+   329→    try {
+   330→      const res = await fetch('/api/ai/chat', {
+   331→        method: 'POST',
+   332→        headers: { 'Content-Type': 'application/json' },
+   333→        body: JSON.stringify({
+   334→          userId,
+   335→          taskId,
+   336→          projectId: task?.project.id,
+   337→          type: 'code_help',
+   338→          question,
+   339→        }),
+   340→      })
+   341→      const json = await res.json()
+   342→      if (!res.ok) throw new Error(json.error || 'AI chat failed')
+   343→      setAiMessages((prev) => [...prev, { role: 'assistant', content: json.data?.response || 'No response' }])
+   344→    } catch (err) {
+   345→      setAiMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' }])
+   346→    } finally {
+   347→      setAiLoading(false)
+   348→    }
+   349→  }
+   350→
+   351→  // ==================== LOADING STATE ====================
+   352→  if (loading) {
+   353→    return (
+   354→      <div className="min-h-screen bg-background">
+   355→        <div className="border-b bg-background">
+   356→          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+   357→            <Skeleton className="h-8 w-8 rounded-md" />
+   358→            <Skeleton className="h-6 w-64" />
+   359→          </div>
+   360→        </div>
+   361→        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+   362→          {Array.from({ length: 6 }).map((_, i) => (
+   363→            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+   364→          ))}
+   365→        </div>
+   366→      </div>
+   367→    )
+   368→  }
+   369→
+   370→  if (error && !task) {
+   371→    return (
+   372→      <div className="min-h-screen bg-background flex items-center justify-center">
+   373→        <div className="text-center space-y-4 p-4">
+   374→          <p className="text-destructive">{error}</p>
+   375→          <Button variant="outline" onClick={() => navigate('tasks')} className="gap-2">
+   376→            <ArrowLeft className="h-4 w-4" />
+   377→            Back to Tasks
+   378→          </Button>
+   379→        </div>
+   380→      </div>
+   381→    )
+   382→  }
+   383→
+   384→  if (!task) return null
+   385→
+   386→  const pConfig = priorityConfig[task.priority] || priorityConfig.medium
+   387→
+   388→  return (
+   389→    <div className="min-h-screen bg-background">
+   390→      {/* Header */}
+   391→      <div className="border-b bg-background sticky top-0 z-40">
+   392→        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+   393→          <div className="flex items-center gap-3 min-w-0">
+   394→            <Button variant="ghost" size="icon" onClick={() => task.project ? navigate('project-detail', { id: task.project.id }) : navigate('tasks')}>
+   395→              <ArrowLeft className="h-4 w-4" />
+   396→            </Button>
+   397→            <div className="min-w-0">
+   398→              <div className="flex items-center gap-2 flex-wrap">
+   399→                <h1 className="text-lg font-bold truncate">{task.title}</h1>
+   400→                <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusColors[task.status] || ''}`}>
+   401→                  {task.status.replace(/_/g, ' ')}
+   402→                </Badge>
+   403→                <Badge variant="outline" className={`text-[10px] px-2 py-0 ${pConfig.color}`}>
+   404→                  {pConfig.label}
+   405→                </Badge>
+   406→              </div>
+   407→            </div>
+   408→          </div>
+   409→        </div>
+   410→      </div>
+   411→
+   412→      {/* Content */}
+   413→      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+   414→        {error && (
+   415→          <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+   416→            {error}
+   417→          </div>
+   418→        )}
+   419→
+   420→        <Tabs value={activeTab} onValueChange={setActiveTab}>
+   421→          <TabsList className="w-full flex overflow-x-auto mb-6 bg-muted p-1 rounded-lg h-auto gap-1">
+   422→            <TabsTrigger value="details" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   423→              <FileText className="h-3.5 w-3.5 hidden sm:block" />
+   424→              Details
+   425→            </TabsTrigger>
+   426→            <TabsTrigger value="evidence" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   427→              <ImageIcon className="h-3.5 w-3.5 hidden sm:block" />
+   428→              Evidence
+   429→            </TabsTrigger>
+   430→            <TabsTrigger value="ai-help" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   431→              <Brain className="h-3.5 w-3.5 hidden sm:block" />
+   432→              AI Help
+   433→            </TabsTrigger>
+   434→            <TabsTrigger value="comments" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   435→              <MessageSquare className="h-3.5 w-3.5 hidden sm:block" />
+   436→              Comments
+   437→              {comments.length > 0 && (
+   438→                <Badge variant="secondary" className="h-4 w-4 p-0 text-[10px] flex items-center justify-center">
+   439→                  {comments.length}
+   440→                </Badge>
+   441→              )}
+   442→            </TabsTrigger>
+   443→          </TabsList>
+   444→
+   445→          {/* ==================== DETAILS TAB ==================== */}
+   446→          <TabsContent value="details" className="space-y-6">
+   447→            {/* Description */}
+   448→            <Card>
+   449→              <CardHeader>
+   450→                <CardTitle className="text-base">Description</CardTitle>
+   451→              </CardHeader>
+   452→              <CardContent>
+   453→                {task.description ? (
+   454→                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+   455→                    {task.description}
+   456→                  </p>
+   457→                ) : (
+   458→                  <p className="text-sm text-muted-foreground italic">No description provided.</p>
+   459→                )}
+   460→              </CardContent>
+   461→            </Card>
+   462→
+   463→            {/* Editable details */}
+   464→            <Card>
+   465→              <CardHeader>
+   466→                <CardTitle className="text-base">Task Details</CardTitle>
+   467→              </CardHeader>
+   468→              <CardContent className="space-y-5">
+   469→                {/* Assigned To */}
+   470→                <div className="flex items-center justify-between">
+   471→                  <div className="flex items-center gap-2 text-sm">
+   472→                    <User className="h-4 w-4 text-muted-foreground" />
+   473→                    <span className="text-muted-foreground">Assigned To</span>
+   474→                  </div>
+   475→                  <div className="flex items-center gap-2">
+   476→                    {task.assignee ? (
+   477→                      <>
+   478→                        <Avatar className="h-6 w-6">
+   479→                          <AvatarImage src={task.assignee.avatar || ''} />
+   480→                          <AvatarFallback className="text-[10px]">
+   481→                            {task.assignee.name?.charAt(0).toUpperCase() || task.assignee.email.charAt(0).toUpperCase()}
+   482→                          </AvatarFallback>
+   483→                        </Avatar>
+   484→                        <span className="text-sm font-medium">{task.assignee.name || task.assignee.email}</span>
+   485→                      </>
+   486→                    ) : (
+   487→                      <span className="text-sm text-muted-foreground">Unassigned</span>
+   488→                    )}
+   489→                  </div>
+   490→                </div>
+   491→
+   492→                <Separator />
+   493→
+   494→                {/* Milestone */}
+   495→                <div className="flex items-center justify-between">
+   496→                  <div className="flex items-center gap-2 text-sm">
+   497→                    <Target className="h-4 w-4 text-muted-foreground" />
+   498→                    <span className="text-muted-foreground">Milestone</span>
+   499→                  </div>
+   500→                  <span className="text-sm font-medium">
+   501→                    {task.milestone ? task.milestone.title : 'None'}
+   502→                  </span>
+   503→                </div>
+   504→
+   505→                <Separator />
+   506→
+   507→                {/* Dates */}
+   508→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   509→                  <div className="flex items-center gap-2 text-sm">
+   510→                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+   511→                    <span className="text-muted-foreground">Start:</span>
+   512→                    <span className="font-medium">{formatDate(task.startDate)}</span>
+   513→                  </div>
+   514→                  <div className="flex items-center gap-2 text-sm">
+   515→                    <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+   516→                    <span className="text-muted-foreground">Due:</span>
+   517→                    <span className="font-medium">{formatDate(task.dueDate)}</span>
+   518→                  </div>
+   519→                </div>
+   520→
+   521→                <Separator />
+   522→
+   523→                {/* Hours */}
+   524→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   525→                  <div className="space-y-1.5">
+   526→                    <Label className="text-xs text-muted-foreground">Estimated Hours</Label>
+   527→                    <Input
+   528→                      type="number"
+   529→                      placeholder="0"
+   530→                      value={editEstimated}
+   531→                      onChange={(e) => setEditEstimated(e.target.value)}
+   532→                      className="h-9"
+   533→                    />
+   534→                  </div>
+   535→                  <div className="space-y-1.5">
+   536→                    <Label className="text-xs text-muted-foreground">Actual Hours</Label>
+   537→                    <Input
+   538→                      type="number"
+   539→                      placeholder="0"
+   540→                      value={editHours}
+   541→                      onChange={(e) => setEditHours(e.target.value)}
+   542→                      className="h-9"
+   543→                    />
+   544→                  </div>
+   545→                </div>
+   546→
+   547→                <Separator />
+   548→
+   549→                {/* Completion slider */}
+   550→                <div className="space-y-3">
+   551→                  <div className="flex items-center justify-between">
+   552→                    <Label className="text-xs text-muted-foreground">Completion</Label>
+   553→                    <span className="text-sm font-medium">{editCompletion}%</span>
+   554→                  </div>
+   555→                  <Slider
+   556→                    value={[editCompletion]}
+   557→                    onValueChange={(v) => setEditCompletion(v[0])}
+   558→                    max={100}
+   559→                    step={5}
+   560→                  />
+   561→                  <Progress value={editCompletion} className="h-1.5" />
+   562→                </div>
+   563→
+   564→                <Separator />
+   565→
+   566→                {/* Status dropdown */}
+   567→                <div className="flex items-center justify-between">
+   568→                  <Label className="text-xs text-muted-foreground">Status</Label>
+   569→                  <Select value={editStatus} onValueChange={setEditStatus}>
+   570→                    <SelectTrigger className="w-[180px] h-9">
+   571→                      <SelectValue />
+   572→                    </SelectTrigger>
+   573→                    <SelectContent>
+   574→                      <SelectItem value="not_started">Not Started</SelectItem>
+   575→                      <SelectItem value="in_progress">In Progress</SelectItem>
+   576→                      <SelectItem value="blocked">Blocked</SelectItem>
+   577→                      <SelectItem value="submitted">Submitted</SelectItem>
+   578→                      <SelectItem value="under_review">Under Review</SelectItem>
+   579→                      <SelectItem value="verified_completed">Verified Completed</SelectItem>
+   580→                      <SelectItem value="overdue">Overdue</SelectItem>
+   581→                    </SelectContent>
+   582→                  </Select>
+   583→                </div>
+   584→
+   585→                {/* Save button */}
+   586→                <div className="flex items-center gap-3 pt-2">
+   587→                  <Button onClick={handleSave} disabled={saving} className="gap-2">
+   588→                    {saving ? (
+   589→                      <Loader2 className="h-4 w-4 animate-spin" />
+   590→                    ) : (
+   591→                      <Save className="h-4 w-4" />
+   592→                    )}
+   593→                    Save Changes
+   594→                  </Button>
+   595→                  {saveSuccess && (
+   596→                    <span className="text-xs text-emerald-600 flex items-center gap-1">
+   597→                      <CheckCircle className="h-3.5 w-3.5" />
+   598→                      Saved!
+   599→                    </span>
+   600→                  )}
+   601→                  {saveError && (
+   602→                    <span className="text-xs text-destructive">{saveError}</span>
+   603→                  )}
+   604→                </div>
+   605→              </CardContent>
+   606→            </Card>
+   607→
+   608→            {/* Dependencies */}
+   609→            <Card>
+   610→              <CardHeader>
+   611→                <CardTitle className="text-base">Dependencies</CardTitle>
+   612→              </CardHeader>
+   613→              <CardContent className="space-y-3">
+   614→                {/* This task depends on */}
+   615→                <div>
+   616→                  <button
+   617→                    className="flex items-center gap-2 text-sm font-medium w-full text-left"
+   618→                    onClick={() => setDepsExpanded(!depsExpanded)}
+   619→                  >
+   620→                    {depsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+   621→                    Depends On ({task.dependencies.length})
+   622→                  </button>
+   623→                  {depsExpanded && (
+   624→                    <div className="ml-6 mt-2 space-y-2">
+   625→                      {task.dependencies.length === 0 ? (
+   626→                        <p className="text-xs text-muted-foreground">No dependencies</p>
+   627→                      ) : (
+   628→                        task.dependencies.map((dep) => (
+   629→                          <div
+   630→                            key={dep.dependsOn.id}
+   631→                            className="flex items-center gap-2 text-sm p-2 rounded border cursor-pointer hover:bg-muted/50"
+   632→                            onClick={() => navigate('task-detail', { id: dep.dependsOn.id })}
+   633→                          >
+   634→                            <Badge variant="outline" className={`text-[10px] ${statusColors[dep.dependsOn.status] || ''}`}>
+   635→                              {dep.dependsOn.status.replace(/_/g, ' ')}
+   636→                            </Badge>
+   637→                            <span className="flex-1 truncate">{dep.dependsOn.title}</span>
+   638→                          </div>
+   639→                        ))
+   640→                      )}
+   641→                    </div>
+   642→                  )}
+   643→                </div>
+   644→
+   645→                <Separator />
+   646→
+   647→                {/* Tasks depending on this */}
+   648→                <div>
+   649→                  <button
+   650→                    className="flex items-center gap-2 text-sm font-medium w-full text-left"
+   651→                    onClick={() => setDepOfExpanded(!depOfExpanded)}
+   652→                  >
+   653→                    {depOfExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+   654→                    Required By ({task.dependentTasks.length})
+   655→                  </button>
+   656→                  {depOfExpanded && (
+   657→                    <div className="ml-6 mt-2 space-y-2">
+   658→                      {task.dependentTasks.length === 0 ? (
+   659→                        <p className="text-xs text-muted-foreground">No tasks depend on this</p>
+   660→                      ) : (
+   661→                        task.dependentTasks.map((dep) => (
+   662→                          <div
+   663→                            key={dep.task.id}
+   664→                            className="flex items-center gap-2 text-sm p-2 rounded border cursor-pointer hover:bg-muted/50"
+   665→                            onClick={() => navigate('task-detail', { id: dep.task.id })}
+   666→                          >
+   667→                            <Badge variant="outline" className={`text-[10px] ${statusColors[dep.task.status] || ''}`}>
+   668→                              {dep.task.status.replace(/_/g, ' ')}
+   669→                            </Badge>
+   670→                            <span className="flex-1 truncate">{dep.task.title}</span>
+   671→                          </div>
+   672→                        ))
+   673→                      )}
+   674→                    </div>
+   675→                  )}
+   676→                </div>
+   677→              </CardContent>
+   678→            </Card>
+   679→          </TabsContent>
+   680→
+   681→          {/* ==================== EVIDENCE TAB ==================== */}
+   682→          <TabsContent value="evidence" className="space-y-4">
+   683→            <div className="flex items-center justify-between">
+   684→              <h3 className="text-sm font-semibold">
+   685→                Evidence ({task.evidence.length})
+   686→              </h3>
+   687→              <div className="flex gap-2">
+   688→                <Button
+   689→                  size="sm"
+   690→                  variant="outline"
+   691→                  onClick={handleVerify}
+   692→                  disabled={verifying || task.evidence.length === 0}
+   693→                  className="gap-1.5"
+   694→                >
+   695→                  {verifying ? (
+   696→                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   697→                  ) : (
+   698→                    <Sparkles className="h-3.5 w-3.5" />
+   699→                  )}
+   700→                  Verify with AI
+   701→                </Button>
+   702→                <Button size="sm" onClick={() => setEvidenceOpen(true)} className="gap-1.5">
+   703→                  <Plus className="h-3.5 w-3.5" />
+   704→                  Add Evidence
+   705→                </Button>
+   706→              </div>
+   707→            </div>
+   708→
+   709→            {task.evidence.length === 0 ? (
+   710→              <Card>
+   711→                <CardContent className="p-8 text-center">
+   712→                  <ImageIcon className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+   713→                  <p className="text-sm text-muted-foreground">No evidence added yet.</p>
+   714→                  <p className="text-xs text-muted-foreground mt-1">Add screenshots, links, or code to prove task completion.</p>
+   715→                </CardContent>
+   716→              </Card>
+   717→            ) : (
+   718→              <div className="space-y-3">
+   719→                {task.evidence.map((ev) => {
+   720→                  const Icon = evidenceTypeIcons[ev.type] || FileText
+   721→                  return (
+   722→                    <Card key={ev.id}>
+   723→                      <CardContent className="p-4 flex items-start gap-3">
+   724→                        <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+   725→                          <Icon className="h-4 w-4 text-muted-foreground" />
+   726→                        </div>
+   727→                        <div className="flex-1 min-w-0">
+   728→                          <div className="flex items-center justify-between gap-2">
+   729→                            <h4 className="text-sm font-medium">{ev.title}</h4>
+   730→                            {ev.confidence !== null && ev.confidence !== undefined && (
+   731→                              <Badge
+   732→                                variant="outline"
+   733→                                className={`text-[10px] shrink-0 ${
+   734→                                  ev.confidence >= 70
+   735→                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+   736→                                    : ev.confidence >= 40
+   737→                                      ? 'bg-amber-100 text-amber-700 border-amber-200'
+   738→                                      : 'bg-red-100 text-red-700 border-red-200'
+   739→                                }`}
+   740→                              >
+   741→                                {Math.round(ev.confidence)}% confidence
+   742→                              </Badge>
+   743→                            )}
+   744→                          </div>
+   745→                          {ev.description && (
+   746→                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+   747→                              {ev.description}
+   748→                            </p>
+   749→                          )}
+   750→                          {ev.url && (
+   751→                            <a
+   752→                              href={ev.url}
+   753→                              target="_blank"
+   754→                              rel="noopener noreferrer"
+   755→                              className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
+   756→                            >
+   757→                              <Link2 className="h-3 w-3" />
+   758→                              {ev.url}
+   759→                            </a>
+   760→                          )}
+   761→                        </div>
+   762→                      </CardContent>
+   763→                    </Card>
+   764→                  )
+   765→                })}
+   766→              </div>
+   767→            )}
+   768→
+   769→            {/* Evidence Dialog */}
+   770→            <Dialog open={evidenceOpen} onOpenChange={setEvidenceOpen}>
+   771→              <DialogContent>
+   772→                <DialogHeader>
+   773→                  <DialogTitle>Add Evidence</DialogTitle>
+   774→                  <DialogDescription>Add proof of work for this task</DialogDescription>
+   775→                </DialogHeader>
+   776→                <div className="space-y-4">
+   777→                  <div className="space-y-2">
+   778→                    <Label>Type</Label>
+   779→                    <Select value={evidenceType} onValueChange={setEvidenceType}>
+   780→                      <SelectTrigger>
+   781→                        <SelectValue />
+   782→                      </SelectTrigger>
+   783→                      <SelectContent>
+   784→                        {evidenceTypes.map((t) => (
+   785→                          <SelectItem key={t.value} value={t.value}>
+   786→                            {t.label}
+   787→                          </SelectItem>
+   788→                        ))}
+   789→                      </SelectContent>
+   790→                    </Select>
+   791→                  </div>
+   792→                  <div className="space-y-2">
+   793→                    <Label>Title *</Label>
+   794→                    <Input
+   795→                      value={evidenceTitle}
+   796→                      onChange={(e) => setEvidenceTitle(e.target.value)}
+   797→                      placeholder="e.g., Login page implementation"
+   798→                    />
+   799→                  </div>
+   800→                  <div className="space-y-2">
+   801→                    <Label>Description</Label>
+   802→                    <Textarea
+   803→                      value={evidenceDesc}
+   804→                      onChange={(e) => setEvidenceDesc(e.target.value)}
+   805→                      placeholder="Brief description of the evidence"
+   806→                      rows={2}
+   807→                    />
+   808→                  </div>
+   809→                  <div className="space-y-2">
+   810→                    <Label>URL</Label>
+   811→                    <Input
+   812→                      value={evidenceUrl}
+   813→                      onChange={(e) => setEvidenceUrl(e.target.value)}
+   814→                      placeholder="https://..."
+   815→                    />
+   816→                  </div>
+   817→                </div>
+   818→                <DialogFooter>
+   819→                  <Button variant="outline" onClick={() => setEvidenceOpen(false)}>
+   820→                    Cancel
+   821→                  </Button>
+   822→                  <Button
+   823→                    onClick={handleAddEvidence}
+   824→                    disabled={evidenceSaving || !evidenceTitle.trim()}
+   825→                    className="gap-2"
+   826→                  >
+   827→                    {evidenceSaving ? (
+   828→                      <Loader2 className="h-4 w-4 animate-spin" />
+   829→                    ) : (
+   830→                      <Plus className="h-4 w-4" />
+   831→                    )}
+   832→                    Add Evidence
+   833→                  </Button>
+   834→                </DialogFooter>
+   835→              </DialogContent>
+   836→            </Dialog>
+   837→          </TabsContent>
+   838→
+   839→          {/* ==================== AI HELP TAB ==================== */}
+   840→          <TabsContent value="ai-help" className="space-y-4">
+   841→            <div className="flex items-center gap-2 mb-2">
+   842→              <Brain className="h-4 w-4 text-primary" />
+   843→              <h3 className="text-sm font-semibold">AI Code Helper</h3>
+   844→            </div>
+   845→
+   846→            {/* Messages */}
+   847→            <div className="space-y-3 max-h-[500px] overflow-y-auto">
+   848→              {aiMessages.length === 0 && (
+   849→                <div className="text-center py-12">
+   850→                  <Brain className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+   851→                  <p className="text-sm text-muted-foreground">Ask AI for help with this task.</p>
+   852→                  <p className="text-xs text-muted-foreground mt-1">
+   853→                    Get code suggestions, debugging help, or architecture advice.
+   854→                  </p>
+   855→                </div>
+   856→              )}
+   857→              {aiMessages.map((msg, i) => (
+   858→                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+   859→                  <div
+   860→                    className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
+   861→                      msg.role === 'user'
+   862→                        ? 'bg-primary text-primary-foreground'
+   863→                        : 'bg-muted'
+   864→                    }`}
+   865→                  >
+   866→                    <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{msg.content}</pre>
+   867→                  </div>
+   868→                </div>
+   869→              ))}
+   870→              {aiLoading && (
+   871→                <div className="flex justify-start">
+   872→                  <div className="bg-muted rounded-lg px-4 py-3 text-sm">
+   873→                    <div className="flex items-center gap-2">
+   874→                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   875→                      <span className="text-muted-foreground">AI is thinking...</span>
+   876→                    </div>
+   877→                  </div>
+   878→                </div>
+   879→              )}
+   880→            </div>
+   881→
+   882→            {/* Input */}
+   883→            <div className="flex gap-2 sticky bottom-0 bg-background pt-2">
+   884→              <Input
+   885→                placeholder="Ask about your task..."
+   886→                value={aiQuestion}
+   887→                onChange={(e) => setAiQuestion(e.target.value)}
+   888→                onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) handleAiChat() }}
+   889→                disabled={aiLoading}
+   890→                className="flex-1"
+   891→              />
+   892→              <Button onClick={handleAiChat} disabled={aiLoading || !aiQuestion.trim()} size="icon">
+   893→                <Send className="h-4 w-4" />
+   894→              </Button>
+   895→            </div>
+   896→          </TabsContent>
+   897→
+   898→          {/* ==================== COMMENTS TAB ==================== */}
+   899→          <TabsContent value="comments" className="space-y-4">
+   900→            <h3 className="text-sm font-semibold">
+   901→              Comments ({comments.length})
+   902→            </h3>
+   903→
+   904→            {/* Comment input */}
+   905→            <div className="flex gap-2">
+   906→              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0 mt-0.5">
+   907→                {userId.charAt(0).toUpperCase()}
+   908→              </div>
+   909→              <div className="flex-1 flex gap-2">
+   910→                <Input
+   911→                  placeholder="Add a comment..."
+   912→                  value={commentInput}
+   913→                  onChange={(e) => setCommentInput(e.target.value)}
+   914→                  onKeyDown={(e) => { if (e.key === 'Enter' && !submittingComment) handleAddComment() }}
+   915→                  disabled={submittingComment}
+   916→                />
+   917→                <Button
+   918→                  onClick={handleAddComment}
+   919→                  disabled={submittingComment || !commentInput.trim()}
+   920→                  size="icon"
+   921→                  className="shrink-0"
+   922→                >
+   923→                  {submittingComment ? (
+   924→                    <Loader2 className="h-4 w-4 animate-spin" />
+   925→                  ) : (
+   926→                    <Send className="h-4 w-4" />
+   927→                  )}
+   928→                </Button>
+   929→              </div>
+   930→            </div>
+   931→
+   932→            <Separator />
+   933→
+   934→            {/* Comments list */}
+   935→            <div className="space-y-4 max-h-[500px] overflow-y-auto">
+   936→              {comments.length === 0 ? (
+   937→                <div className="text-center py-8">
+   938→                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+   939→                  <p className="text-sm text-muted-foreground">No comments yet.</p>
+   940→                </div>
+   941→              ) : (
+   942→                comments.map((comment) => (
+   943→                  <div key={comment.id} className="flex gap-3">
+   944→                    <Avatar className="h-8 w-8 shrink-0">
+   945→                      <AvatarImage src={comment.user.avatar || ''} />
+   946→                      <AvatarFallback className="text-[10px]">
+   947→                        {comment.user.name?.charAt(0).toUpperCase() || comment.user.email.charAt(0).toUpperCase()}
+   948→                      </AvatarFallback>
+   949→                    </Avatar>
+   950→                    <div className="flex-1">
+   951→                      <div className="flex items-center gap-2">
+   952→                        <span className="text-sm font-medium">
+   953→                          {comment.user.name || comment.user.email}
+   954→                        </span>
+   955→                        <span className="text-xs text-muted-foreground">
+   956→                          {new Date(comment.createdAt).toLocaleDateString('en-US', {
+   957→                            month: 'short',
+   958→                            day: 'numeric',
+   959→                            hour: 'numeric',
+   960→                            minute: '2-digit',
+   961→                          })}
+   962→                        </span>
+   963→                      </div>
+   964→                      <p className="text-sm text-muted-foreground mt-0.5">{comment.content}</p>
+   965→                    </div>
+   966→                  </div>
+   967→                ))
+   968→              )}
+   969→            </div>
+   970→          </TabsContent>
+   971→        </Tabs>
+   972→      </div>
+   973→    </div>
+   974→  )
+   975→}
+   976→

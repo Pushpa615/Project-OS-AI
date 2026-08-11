@@ -69,7 +69,7 @@ interface NotifPrefs {
 
 // ==================== COMPONENT ====================
 
-export function SettingsPage({ userId }: { userId: string }) {
+export function SettingsPage({ userId, userEmail }: { userId: string; userEmail?: string }) {
   const { theme, setTheme } = useTheme()
 
   // Profile state
@@ -113,17 +113,13 @@ export function SettingsPage({ userId }: { userId: string }) {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [profileRes, notifRes] = await Promise.all([
-          fetch(`/api/onboarding?userId=${userId}`),
-          fetch(`/api/notifications?userId=${userId}`),
-        ])
-
+        const profileRes = await fetch(`/api/onboarding?userId=${userId}`)
         const profileJson = await profileRes.json()
         if (profileJson.data) {
           const d = profileJson.data
           setProfile({
             fullName: d.fullName || d.name || '',
-            email: d.email || '',
+            email: d.email || userEmail || '',
             college: d.college || '',
             course: d.course || '',
             academicYear: d.academicYear || '',
@@ -131,28 +127,40 @@ export function SettingsPage({ userId }: { userId: string }) {
             bio: d.bio || '',
             skills: d.skills || [],
           })
-        }
-
-        const notifJson = await notifRes.json()
-        if (notifJson.data?.preferences) {
-          const p = notifJson.data.preferences
-          setNotifPrefs({
-            emailNotifs: p.emailNotifs ?? true,
-            smsNotifs: p.smsNotifs ?? false,
-            pushNotifs: p.pushNotifs ?? true,
-            inAppNotifs: p.inAppNotifs ?? true,
-            reminderDays: JSON.parse(p.reminderDays || '[7,3,1]'),
-            reminderHours: JSON.parse(p.reminderHours || '[6,1]'),
-          })
+          // Load notification preferences if returned by the API
+          if (d.notificationPrefs) {
+            const p = d.notificationPrefs
+            setNotifPrefs({
+              emailNotifs: p.emailNotifs ?? true,
+              smsNotifs: p.smsNotifs ?? false,
+              pushNotifs: p.pushNotifs ?? true,
+              inAppNotifs: p.inAppNotifs ?? true,
+              reminderDays: safeJSONParse(p.reminderDays, [7, 3, 1]),
+              reminderHours: safeJSONParse(p.reminderHours, [6, 1]),
+            })
+          }
         }
       } catch {
-        // ignore
+        // ignore — use defaults
       } finally {
         setLoading(false)
       }
     }
     fetchData()
-  }, [userId])
+  }, [userId, userEmail])
+
+  function safeJSONParse(val: unknown, fallback: number[]): number[] {
+    if (Array.isArray(val)) return val
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val)
+        return Array.isArray(parsed) ? parsed : fallback
+      } catch {
+        return fallback
+      }
+    }
+    return fallback
+  }
 
   function clearMessages() {
     setError(null)

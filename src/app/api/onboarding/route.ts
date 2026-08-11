@@ -20,18 +20,38 @@ export async function GET(req: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
-    const profile = await db.userProfile.findUnique({
-      where: { userId },
-      include: { connectedAccounts: true },
-    })
+    const [profile, user, notifPrefs] = await Promise.all([
+      db.userProfile.findUnique({
+        where: { userId },
+        include: { connectedAccounts: true },
+      }),
+      db.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true },
+      }),
+      db.notificationPreference.findUnique({
+        where: { userId },
+      }),
+    ])
     if (!profile) {
-      return NextResponse.json({ data: { onboarded: false } })
+      return NextResponse.json({ data: { onboarded: false, email: user?.email || '' } })
     }
     return NextResponse.json({
       data: {
         ...profile,
+        email: user?.email || '',
         skills: JSON.parse(profile.skills || '[]'),
         onboarded: profile.onboarded,
+        notificationPrefs: notifPrefs
+          ? {
+              emailNotifs: notifPrefs.emailNotifs,
+              smsNotifs: notifPrefs.smsNotifs,
+              pushNotifs: notifPrefs.pushNotifs,
+              inAppNotifs: notifPrefs.inAppNotifs,
+              reminderDays: notifPrefs.reminderDays,
+              reminderHours: notifPrefs.reminderHours,
+            }
+          : null,
       },
     })
   } catch (error) {

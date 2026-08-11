@@ -44,7 +44,7 @@ interface Report {
   recommendedSkills: string | null
   overallAssessment: string | null
   generatedAt: string
-  feedback: AiFeedback[]
+  [key: string]: unknown
 }
 
 interface AiFeedback {
@@ -83,6 +83,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
 
   const [projects, setProjects] = useState<Project[]>([])
   const [reports, setReports] = useState<Report[]>([])
+  const [feedback, setFeedback] = useState<AiFeedback[]>([])
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -101,10 +102,14 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
 
   // Fetch reports
   async function fetchReports(projectId?: string) {
+    if (!projectId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
-      const url = projectId ? `/api/reports?projectId=${projectId}` : `/api/reports?userId=${userId}`
+      const url = `/api/reports?projectId=${projectId}`
       const res = await fetch(url)
       const json = await res.json()
       if (json.data) {
@@ -113,6 +118,16 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
         if (data.length > 0 && !projectId) {
           setSelectedReport(data[0])
         }
+      }
+      if (json.feedback) {
+        setFeedback(json.feedback.map((fb: { id: string; userId: string; strength: string | null; improvement: string | null; nextSteps: string | null; user?: { name?: string; email?: string } }) => ({
+          id: fb.id,
+          userId: fb.userId,
+          userName: fb.user?.name || fb.user?.email,
+          strength: fb.strength,
+          improvement: fb.improvement,
+          nextSteps: fb.nextSteps,
+        })))
       }
     } catch {
       setError('Failed to load reports')
@@ -137,7 +152,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
       const res = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, userId }),
       })
       const json = await res.json()
       if (json.error) {
@@ -312,7 +327,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
   if (!report) return null
 
   const skills = parseList(report.recommendedSkills)
-  const feedbackItems = report.feedback || []
+  const feedbackItems = feedback
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">

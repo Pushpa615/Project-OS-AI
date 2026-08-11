@@ -140,14 +140,13 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
           )
         }
 
-        // Fetch members list
+        // Fetch members list (fallback if analytics has no team stats)
         if (projectId) {
           promises.push(
             fetch(`/api/projects/${projectId}/members`)
               .then((res) => res.json())
               .then((json) => {
-                if (json.data && !analytics) {
-                  // If analytics didn't load, fall back to members
+                if (json.data) {
                   const m = (json.data || []).map((d: { user: { id: string; name: string | null; email: string; avatar: string | null }; role: string; joinedAt: string }) => ({
                     userId: d.user.id,
                     name: d.user.name || d.user.email,
@@ -161,7 +160,8 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
                     overdueTasks: 0,
                     contributionScore: 0,
                   }))
-                  if (members.length === 0) setMembers(m)
+                  // Only use fallback if analytics didn't provide members
+                  setMembers((prev) => (prev.length === 0 ? m : prev))
                 }
               })
               .catch(() => {})
@@ -196,11 +196,10 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
         fetch(`/api/analytics?projectId=${projectId}`).then((r) => r.json()),
         fetch(`/api/projects/${projectId}/members`).then((r) => r.json()),
       ])
-      if (analyticsRes.data) {
+      if (analyticsRes.data?.teamStats?.length > 0) {
         setAnalytics(analyticsRes.data)
-        setMembers(analyticsRes.data.teamStats || [])
-      }
-      if (membersRes.data && members.length === 0) {
+        setMembers(analyticsRes.data.teamStats)
+      } else if (membersRes.data) {
         setMembers(membersRes.data.map((d: any) => ({
           userId: d.user.id,
           name: d.user.name || d.user.email,

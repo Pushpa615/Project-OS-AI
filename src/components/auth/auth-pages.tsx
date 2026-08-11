@@ -213,13 +213,13 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
         body: JSON.stringify({ name: values.name, email: values.email, password: values.password }),
       })
 
+      const regData = await res.json()
+
       if (!res.ok) {
-        const data = await res.json()
-        setServerError(data.error || 'Registration failed. Please try again.')
+        setServerError(regData.error || 'Registration failed. Please try again.')
         return
       }
 
-      const regData = await res.json()
       const registeredUser = regData.data
 
       // Auto-login after registration

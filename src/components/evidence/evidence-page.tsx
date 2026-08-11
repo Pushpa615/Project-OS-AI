@@ -81,11 +81,11 @@ const EVIDENCE_ICONS: Record<string, React.ReactNode> = {
 
 function getConfidenceBadge(confidence: number | null) {
   if (confidence === null) return null
-  if (confidence >= 80)
-    return <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">{Math.round(confidence)}% - Verified</Badge>
-  if (confidence >= 50)
-    return <Badge className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20">{Math.round(confidence)}% - Partial</Badge>
-  return <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20">{Math.round(confidence)}% - Low</Badge>
+  if (confidence >= 0.8)
+    return <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">{Math.round(confidence * 100)}% - Verified</Badge>
+  if (confidence >= 0.5)
+    return <Badge className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20">{Math.round(confidence * 100)}% - Partial</Badge>
+  return <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20">{Math.round(confidence * 100)}% - Low</Badge>
 }
 
 function formatDate(dateStr: string): string {
@@ -196,6 +196,7 @@ export function EvidencePage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          userId,
           type: form.type,
           title: form.title,
           description: form.description || null,
@@ -224,6 +225,7 @@ export function EvidencePage({
       const res = await fetch(`/api/tasks/${taskId}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
       })
       const json = await res.json()
       if (json.error) {
@@ -472,7 +474,7 @@ export function EvidencePage({
                         onClick={() => setSelectedTaskId(task.id)}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          {avgConfidence !== null && avgConfidence >= 80 ? (
+                          {avgConfidence !== null && avgConfidence >= 0.8 ? (
                             <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
                           ) : evList.length > 0 ? (
                             <Clock className="h-4 w-4 text-amber-500 shrink-0" />
@@ -486,12 +488,12 @@ export function EvidencePage({
                           {avgConfidence !== null && (
                             <Badge
                               className={
-                                avgConfidence >= 80
+                                avgConfidence >= 0.8
                                   ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
                                   : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
                               }
                             >
-                              {Math.round(avgConfidence)}%
+                              {Math.round(avgConfidence * 100)}%
                             </Badge>
                           )}
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />

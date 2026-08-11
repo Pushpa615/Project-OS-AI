@@ -21,7 +21,18 @@ export async function GET(req: NextRequest) {
       orderBy: { generatedAt: 'desc' },
     })
 
-    return NextResponse.json({ data: reports })
+    // Fetch individual AI feedback for the project
+    const feedback = await db.aiFeedback.findMany({
+      where: { projectId, category: 'project_report' },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+      orderBy: { generatedAt: 'desc' },
+    })
+
+    return NextResponse.json({ data: reports, feedback })
   } catch (error) {
     console.error('Get reports error:', error)
     return NextResponse.json(
@@ -90,7 +101,7 @@ export async function POST(req: NextRequest) {
     // Calculate task stats
     const taskStats = {
       total: project.tasks.length,
-      completed: project.tasks.filter((t) => t.status === 'verified_completed').length,
+      completed: project.tasks.filter((t) => ['verified_completed', 'submitted', 'under_review'].includes(t.status)).length,
       verified: project.tasks.filter((t) => t.status === 'verified_completed').length,
       overdue: project.tasks.filter((t) => t.status === 'overdue').length,
       inProgress: project.tasks.filter((t) => t.status === 'in_progress').length,

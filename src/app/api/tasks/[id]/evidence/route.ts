@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // ========== POST: Add evidence ==========
 const addEvidenceSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
   type: z.enum(['screenshot', 'video', 'document', 'link', 'code', 'other']),
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional().default(''),
@@ -27,12 +28,11 @@ export async function POST(
       )
     }
 
-    const { type, title, description, url, fileName } = parsed.data
+    const { userId, type, title, description, url, fileName } = parsed.data
 
     // Check task exists
     const task = await db.task.findUnique({
       where: { id },
-      include: { project: true },
     })
 
     if (!task) {
@@ -58,7 +58,7 @@ export async function POST(
     await db.activityLog.create({
       data: {
         projectId: task.projectId,
-        userId: task.assignedTo || task.project.createdBy,
+        userId,
         action: 'evidence_added',
         description: `Added evidence "${title}" to task "${task.title}"`,
         metadata: JSON.stringify({ taskId: id, evidenceId: evidence.id, type }),

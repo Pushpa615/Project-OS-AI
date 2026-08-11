@@ -1,0 +1,761 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect } from 'react'
+     4→import {
+     5→  Settings as SettingsIcon,
+     6→  User,
+     7→  Bell,
+     8→  Shield,
+     9→  Eye,
+    10→  Palette,
+    11→  Save,
+    12→  Loader2,
+    13→  AlertTriangle,
+    14→  Sun,
+    15→  Moon,
+    16→  Monitor,
+    17→} from 'lucide-react'
+    18→import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+    19→import { Button } from '@/components/ui/button'
+    20→import { Input } from '@/components/ui/input'
+    21→import { Label } from '@/components/ui/label'
+    22→import { Textarea } from '@/components/ui/textarea'
+    23→import { Switch } from '@/components/ui/switch'
+    24→import { Checkbox } from '@/components/ui/checkbox'
+    25→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    26→import { Skeleton } from '@/components/ui/skeleton'
+    27→import { Separator } from '@/components/ui/separator'
+    28→import {
+    29→  Select,
+    30→  SelectContent,
+    31→  SelectItem,
+    32→  SelectTrigger,
+    33→  SelectValue,
+    34→} from '@/components/ui/select'
+    35→import {
+    36→  AlertDialog,
+    37→  AlertDialogAction,
+    38→  AlertDialogCancel,
+    39→  AlertDialogContent,
+    40→  AlertDialogDescription,
+    41→  AlertDialogFooter,
+    42→  AlertDialogHeader,
+    43→  AlertDialogTitle,
+    44→  AlertDialogTrigger,
+    45→} from '@/components/ui/alert-dialog'
+    46→import { useTheme } from 'next-themes'
+    47→
+    48→// ==================== TYPES ====================
+    49→
+    50→interface ProfileData {
+    51→  fullName: string
+    52→  email: string
+    53→  college: string
+    54→  course: string
+    55→  academicYear: string
+    56→  phone: string
+    57→  bio: string
+    58→  skills: string[]
+    59→}
+    60→
+    61→interface NotifPrefs {
+    62→  emailNotifs: boolean
+    63→  smsNotifs: boolean
+    64→  pushNotifs: boolean
+    65→  inAppNotifs: boolean
+    66→  reminderDays: number[]
+    67→  reminderHours: number[]
+    68→}
+    69→
+    70→// ==================== COMPONENT ====================
+    71→
+    72→export function SettingsPage({ userId }: { userId: string }) {
+    73→  const { theme, setTheme } = useTheme()
+    74→
+    75→  // Profile state
+    76→  const [profile, setProfile] = useState<ProfileData>({
+    77→    fullName: '',
+    78→    email: '',
+    79→    college: '',
+    80→    course: '',
+    81→    academicYear: '',
+    82→    phone: '',
+    83→    bio: '',
+    84→    skills: [],
+    85→  })
+    86→
+    87→  // Notification prefs state
+    88→  const [notifPrefs, setNotifPrefs] = useState<NotifPrefs>({
+    89→    emailNotifs: true,
+    90→    smsNotifs: false,
+    91→    pushNotifs: true,
+    92→    inAppNotifs: true,
+    93→    reminderDays: [7, 3, 1],
+    94→    reminderHours: [6, 1],
+    95→  })
+    96→
+    97→  // Privacy state
+    98→  const [publicPortfolio, setPublicPortfolio] = useState(false)
+    99→  const [dataSharing, setDataSharing] = useState({ analytics: true, ai: true, team: true })
+   100→
+   101→  // Security state
+   102→  const [currentPassword, setCurrentPassword] = useState('')
+   103→  const [newPassword, setNewPassword] = useState('')
+   104→  const [confirmPassword, setConfirmPassword] = useState('')
+   105→
+   106→  // UI state
+   107→  const [loading, setLoading] = useState(true)
+   108→  const [saving, setSaving] = useState<string | null>(null)
+   109→  const [error, setError] = useState<string | null>(null)
+   110→  const [success, setSuccess] = useState<string | null>(null)
+   111→
+   112→  // Fetch profile and notification prefs
+   113→  useEffect(() => {
+   114→    async function fetchData() {
+   115→      try {
+   116→        const [profileRes, notifRes] = await Promise.all([
+   117→          fetch(`/api/onboarding?userId=${userId}`),
+   118→          fetch(`/api/notifications?userId=${userId}`),
+   119→        ])
+   120→
+   121→        const profileJson = await profileRes.json()
+   122→        if (profileJson.data) {
+   123→          const d = profileJson.data
+   124→          setProfile({
+   125→            fullName: d.fullName || d.name || '',
+   126→            email: d.email || '',
+   127→            college: d.college || '',
+   128→            course: d.course || '',
+   129→            academicYear: d.academicYear || '',
+   130→            phone: d.phone || '',
+   131→            bio: d.bio || '',
+   132→            skills: d.skills || [],
+   133→          })
+   134→        }
+   135→
+   136→        const notifJson = await notifRes.json()
+   137→        if (notifJson.data?.preferences) {
+   138→          const p = notifJson.data.preferences
+   139→          setNotifPrefs({
+   140→            emailNotifs: p.emailNotifs ?? true,
+   141→            smsNotifs: p.smsNotifs ?? false,
+   142→            pushNotifs: p.pushNotifs ?? true,
+   143→            inAppNotifs: p.inAppNotifs ?? true,
+   144→            reminderDays: JSON.parse(p.reminderDays || '[7,3,1]'),
+   145→            reminderHours: JSON.parse(p.reminderHours || '[6,1]'),
+   146→          })
+   147→        }
+   148→      } catch {
+   149→        // ignore
+   150→      } finally {
+   151→        setLoading(false)
+   152→      }
+   153→    }
+   154→    fetchData()
+   155→  }, [userId])
+   156→
+   157→  function clearMessages() {
+   158→    setError(null)
+   159→    setSuccess(null)
+   160→  }
+   161→
+   162→  // Save profile
+   163→  async function saveProfile() {
+   164→    clearMessages()
+   165→    setSaving('profile')
+   166→    try {
+   167→      const res = await fetch('/api/onboarding', {
+   168→        method: 'PUT',
+   169→        headers: { 'Content-Type': 'application/json' },
+   170→        body: JSON.stringify({
+   171→          userId,
+   172→          fullName: profile.fullName,
+   173→          college: profile.college,
+   174→          course: profile.course,
+   175→          academicYear: profile.academicYear,
+   176→          phone: profile.phone,
+   177→          bio: profile.bio,
+   178→          skills: profile.skills,
+   179→        }),
+   180→      })
+   181→      const json = await res.json()
+   182→      if (json.error) {
+   183→        setError(json.error)
+   184→      } else {
+   185→        setSuccess('Profile updated successfully')
+   186→      }
+   187→    } catch {
+   188→      setError('Failed to save profile')
+   189→    } finally {
+   190→      setSaving(null)
+   191→    }
+   192→  }
+   193→
+   194→  // Save notifications
+   195→  async function saveNotifications() {
+   196→    clearMessages()
+   197→    setSaving('notifications')
+   198→    try {
+   199→      const res = await fetch('/api/notifications', {
+   200→        method: 'PUT',
+   201→        headers: { 'Content-Type': 'application/json' },
+   202→        body: JSON.stringify({
+   203→          userId,
+   204→          preferences: {
+   205→            emailNotifs: notifPrefs.emailNotifs,
+   206→            smsNotifs: notifPrefs.smsNotifs,
+   207→            pushNotifs: notifPrefs.pushNotifs,
+   208→            inAppNotifs: notifPrefs.inAppNotifs,
+   209→            reminderDays: JSON.stringify(notifPrefs.reminderDays),
+   210→            reminderHours: JSON.stringify(notifPrefs.reminderHours),
+   211→          },
+   212→        }),
+   213→      })
+   214→      const json = await res.json()
+   215→      if (json.error) {
+   216→        setError(json.error)
+   217→      } else {
+   218→        setSuccess('Notification preferences saved')
+   219→      }
+   220→    } catch {
+   221→      setError('Failed to save preferences')
+   222→    } finally {
+   223→      setSaving(null)
+   224→    }
+   225→  }
+   226→
+   227→  // Change password
+   228→  async function changePassword() {
+   229→    clearMessages()
+   230→    if (newPassword !== confirmPassword) {
+   231→      setError('Passwords do not match')
+   232→      return
+   233→    }
+   234→    if (newPassword.length < 8) {
+   235→      setError('Password must be at least 8 characters')
+   236→      return
+   237→    }
+   238→    setSaving('security')
+   239→    try {
+   240→      const res = await fetch('/api/auth/reset-password', {
+   241→        method: 'POST',
+   242→        headers: { 'Content-Type': 'application/json' },
+   243→        body: JSON.stringify({
+   244→          currentPassword,
+   245→          newPassword,
+   246→        }),
+   247→      })
+   248→      const json = await res.json()
+   249→      if (json.error) {
+   250→        setError(json.error)
+   251→      } else {
+   252→        setSuccess('Password changed successfully')
+   253→        setCurrentPassword('')
+   254→        setNewPassword('')
+   255→        setConfirmPassword('')
+   256→      }
+   257→    } catch {
+   258→      setError('Failed to change password')
+   259→    } finally {
+   260→      setSaving(null)
+   261→    }
+   262→  }
+   263→
+   264→  // ==================== LOADING STATE ====================
+   265→
+   266→  if (loading) {
+   267→    return (
+   268→      <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   269→        <Skeleton className="h-8 w-48" />
+   270→        <Skeleton className="h-10 w-96" />
+   271→        <div className="space-y-4">
+   272→          <Skeleton className="h-64 rounded-xl" />
+   273→          <Skeleton className="h-64 rounded-xl" />
+   274→        </div>
+   275→      </div>
+   276→    )
+   277→  }
+   278→
+   279→  // ==================== RENDER ====================
+   280→
+   281→  return (
+   282→    <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   283→      {/* Header */}
+   284→      <div>
+   285→        <h1 className="text-2xl font-bold flex items-center gap-2">
+   286→          <SettingsIcon className="h-6 w-6 text-primary" />
+   287→          Settings
+   288→        </h1>
+   289→        <p className="text-sm text-muted-foreground mt-1">
+   290→          Manage your account and preferences
+   291→        </p>
+   292→      </div>
+   293→
+   294→      {/* Success / Error Messages */}
+   295→      {success && (
+   296→        <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
+   297→          <Save className="h-4 w-4" /> {success}
+   298→        </div>
+   299→      )}
+   300→      {error && (
+   301→        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm flex items-center gap-2">
+   302→          <AlertTriangle className="h-4 w-4" /> {error}
+   303→        </div>
+   304→      )}
+   305→
+   306→      {/* Tabs */}
+   307→      <Tabs defaultValue="profile" className="space-y-4">
+   308→        <TabsList className="w-full sm:w-auto flex flex-wrap gap-1">
+   309→          <TabsTrigger value="profile" className="gap-1.5">
+   310→            <User className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Profile</span>
+   311→          </TabsTrigger>
+   312→          <TabsTrigger value="notifications" className="gap-1.5">
+   313→            <Bell className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Notifications</span>
+   314→          </TabsTrigger>
+   315→          <TabsTrigger value="security" className="gap-1.5">
+   316→            <Shield className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Security</span>
+   317→          </TabsTrigger>
+   318→          <TabsTrigger value="privacy" className="gap-1.5">
+   319→            <Eye className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Privacy</span>
+   320→          </TabsTrigger>
+   321→          <TabsTrigger value="appearance" className="gap-1.5">
+   322→            <Palette className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Appearance</span>
+   323→          </TabsTrigger>
+   324→        </TabsList>
+   325→
+   326→        {/* ==================== PROFILE TAB ==================== */}
+   327→        <TabsContent value="profile">
+   328→          <Card>
+   329→            <CardHeader>
+   330→              <CardTitle className="text-base">Profile Information</CardTitle>
+   331→              <CardDescription>Update your personal details</CardDescription>
+   332→            </CardHeader>
+   333→            <CardContent className="space-y-4">
+   334→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   335→                <div className="space-y-2">
+   336→                  <Label htmlFor="fullName">Full Name</Label>
+   337→                  <Input
+   338→                    id="fullName"
+   339→                    value={profile.fullName}
+   340→                    onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+   341→                    placeholder="Your full name"
+   342→                  />
+   343→                </div>
+   344→                <div className="space-y-2">
+   345→                  <Label htmlFor="email">Email</Label>
+   346→                  <Input
+   347→                    id="email"
+   348→                    value={profile.email}
+   349→                    readOnly
+   350→                    className="bg-muted opacity-70"
+   351→                    placeholder="your@email.com"
+   352→                  />
+   353→                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+   354→                </div>
+   355→                <div className="space-y-2">
+   356→                  <Label htmlFor="college">College</Label>
+   357→                  <Input
+   358→                    id="college"
+   359→                    value={profile.college}
+   360→                    onChange={(e) => setProfile({ ...profile, college: e.target.value })}
+   361→                    placeholder="Your college/university"
+   362→                  />
+   363→                </div>
+   364→                <div className="space-y-2">
+   365→                  <Label htmlFor="course">Course</Label>
+   366→                  <Input
+   367→                    id="course"
+   368→                    value={profile.course}
+   369→                    onChange={(e) => setProfile({ ...profile, course: e.target.value })}
+   370→                    placeholder="Your course of study"
+   371→                  />
+   372→                </div>
+   373→                <div className="space-y-2">
+   374→                  <Label htmlFor="academicYear">Academic Year</Label>
+   375→                  <Select
+   376→                    value={profile.academicYear}
+   377→                    onValueChange={(v) => setProfile({ ...profile, academicYear: v })}
+   378→                  >
+   379→                    <SelectTrigger id="academicYear">
+   380→                      <SelectValue placeholder="Select year" />
+   381→                    </SelectTrigger>
+   382→                    <SelectContent>
+   383→                      <SelectItem value="1">1st Year</SelectItem>
+   384→                      <SelectItem value="2">2nd Year</SelectItem>
+   385→                      <SelectItem value="3">3rd Year</SelectItem>
+   386→                      <SelectItem value="4">4th Year</SelectItem>
+   387→                      <SelectItem value="5">5th Year</SelectItem>
+   388→                    </SelectContent>
+   389→                  </Select>
+   390→                </div>
+   391→                <div className="space-y-2">
+   392→                  <Label htmlFor="phone">Phone Number</Label>
+   393→                  <Input
+   394→                    id="phone"
+   395→                    value={profile.phone}
+   396→                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+   397→                    placeholder="Your phone number"
+   398→                  />
+   399→                </div>
+   400→              </div>
+   401→              <div className="space-y-2">
+   402→                <Label htmlFor="bio">Bio</Label>
+   403→                <Textarea
+   404→                  id="bio"
+   405→                  value={profile.bio}
+   406→                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+   407→                  placeholder="Tell us about yourself..."
+   408→                  rows={3}
+   409→                />
+   410→              </div>
+   411→              <div className="flex justify-end">
+   412→                <Button onClick={saveProfile} disabled={saving === 'profile'}>
+   413→                  {saving === 'profile' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+   414→                  Save Profile
+   415→                </Button>
+   416→              </div>
+   417→            </CardContent>
+   418→          </Card>
+   419→        </TabsContent>
+   420→
+   421→        {/* ==================== NOTIFICATIONS TAB ==================== */}
+   422→        <TabsContent value="notifications">
+   423→          <Card>
+   424→            <CardHeader>
+   425→              <CardTitle className="text-base">Notification Preferences</CardTitle>
+   426→              <CardDescription>Choose how you want to be notified</CardDescription>
+   427→            </CardHeader>
+   428→            <CardContent className="space-y-6">
+   429→              {/* Toggle Switches */}
+   430→              <div className="space-y-4">
+   431→                <div className="flex items-center justify-between">
+   432→                  <div>
+   433→                    <p className="text-sm font-medium">Email Notifications</p>
+   434→                    <p className="text-xs text-muted-foreground">Receive notifications via email</p>
+   435→                  </div>
+   436→                  <Switch
+   437→                    checked={notifPrefs.emailNotifs}
+   438→                    onCheckedChange={(c) => setNotifPrefs({ ...notifPrefs, emailNotifs: c })}
+   439→                  />
+   440→                </div>
+   441→                <Separator />
+   442→                <div className="flex items-center justify-between">
+   443→                  <div>
+   444→                    <p className="text-sm font-medium">SMS Notifications</p>
+   445→                    <p className="text-xs text-muted-foreground">Receive notifications via SMS</p>
+   446→                  </div>
+   447→                  <Switch
+   448→                    checked={notifPrefs.smsNotifs}
+   449→                    onCheckedChange={(c) => setNotifPrefs({ ...notifPrefs, smsNotifs: c })}
+   450→                  />
+   451→                </div>
+   452→                <Separator />
+   453→                <div className="flex items-center justify-between">
+   454→                  <div>
+   455→                    <p className="text-sm font-medium">Push Notifications</p>
+   456→                    <p className="text-xs text-muted-foreground">Receive push notifications in browser</p>
+   457→                  </div>
+   458→                  <Switch
+   459→                    checked={notifPrefs.pushNotifs}
+   460→                    onCheckedChange={(c) => setNotifPrefs({ ...notifPrefs, pushNotifs: c })}
+   461→                  />
+   462→                </div>
+   463→                <Separator />
+   464→                <div className="flex items-center justify-between">
+   465→                  <div>
+   466→                    <p className="text-sm font-medium">In-App Notifications</p>
+   467→                    <p className="text-xs text-muted-foreground">Show notifications inside the app</p>
+   468→                  </div>
+   469→                  <Switch
+   470→                    checked={notifPrefs.inAppNotifs}
+   471→                    onCheckedChange={(c) => setNotifPrefs({ ...notifPrefs, inAppNotifs: c })}
+   472→                  />
+   473→                </div>
+   474→              </div>
+   475→
+   476→              <Separator />
+   477→
+   478→              {/* Reminder Configuration */}
+   479→              <div className="space-y-3">
+   480→                <div>
+   481→                  <p className="text-sm font-medium">Deadline Reminders</p>
+   482→                  <p className="text-xs text-muted-foreground">Days before deadline to send reminders</p>
+   483→                </div>
+   484→                <div className="flex flex-wrap gap-4">
+   485→                  {[7, 3, 1].map((day) => (
+   486→                    <div key={day} className="flex items-center gap-2">
+   487→                      <Checkbox
+   488→                        id={`day-${day}`}
+   489→                        checked={notifPrefs.reminderDays.includes(day)}
+   490→                        onCheckedChange={(checked) => {
+   491→                          setNotifPrefs({
+   492→                            ...notifPrefs,
+   493→                            reminderDays: checked
+   494→                              ? [...notifPrefs.reminderDays, day]
+   495→                              : notifPrefs.reminderDays.filter((d) => d !== day),
+   496→                          })
+   497→                        }}
+   498→                      />
+   499→                      <Label htmlFor={`day-${day}`} className="text-sm">
+   500→                        {day} day{day !== 1 ? 's' : ''} before
+   501→                      </Label>
+   502→                    </div>
+   503→                  ))}
+   504→                </div>
+   505→              </div>
+   506→
+   507→              <div className="space-y-3">
+   508→                <div>
+   509→                  <p className="text-sm font-medium">Same-Day Reminders</p>
+   510→                  <p className="text-xs text-muted-foreground">Hours before deadline to send reminders</p>
+   511→                </div>
+   512→                <div className="flex flex-wrap gap-4">
+   513→                  {[6, 1].map((hour) => (
+   514→                    <div key={hour} className="flex items-center gap-2">
+   515→                      <Checkbox
+   516→                        id={`hour-${hour}`}
+   517→                        checked={notifPrefs.reminderHours.includes(hour)}
+   518→                        onCheckedChange={(checked) => {
+   519→                          setNotifPrefs({
+   520→                            ...notifPrefs,
+   521→                            reminderHours: checked
+   522→                              ? [...notifPrefs.reminderHours, hour]
+   523→                              : notifPrefs.reminderHours.filter((h) => h !== hour),
+   524→                          })
+   525→                        }}
+   526→                      />
+   527→                      <Label htmlFor={`hour-${hour}`} className="text-sm">
+   528→                        {hour} hour{hour !== 1 ? 's' : ''} before
+   529→                      </Label>
+   530→                    </div>
+   531→                  ))}
+   532→                </div>
+   533→              </div>
+   534→
+   535→              <div className="flex justify-end">
+   536→                <Button onClick={saveNotifications} disabled={saving === 'notifications'}>
+   537→                  {saving === 'notifications' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+   538→                  Save Preferences
+   539→                </Button>
+   540→              </div>
+   541→            </CardContent>
+   542→          </Card>
+   543→        </TabsContent>
+   544→
+   545→        {/* ==================== SECURITY TAB ==================== */}
+   546→        <TabsContent value="security">
+   547→          <div className="space-y-4">
+   548→            <Card>
+   549→              <CardHeader>
+   550→                <CardTitle className="text-base">Change Password</CardTitle>
+   551→                <CardDescription>Update your account password</CardDescription>
+   552→              </CardHeader>
+   553→              <CardContent className="space-y-4">
+   554→                <div className="space-y-2">
+   555→                  <Label htmlFor="currentPassword">Current Password</Label>
+   556→                  <Input
+   557→                    id="currentPassword"
+   558→                    type="password"
+   559→                    value={currentPassword}
+   560→                    onChange={(e) => setCurrentPassword(e.target.value)}
+   561→                    placeholder="Enter current password"
+   562→                  />
+   563→                </div>
+   564→                <div className="space-y-2">
+   565→                  <Label htmlFor="newPassword">New Password</Label>
+   566→                  <Input
+   567→                    id="newPassword"
+   568→                    type="password"
+   569→                    value={newPassword}
+   570→                    onChange={(e) => setNewPassword(e.target.value)}
+   571→                    placeholder="Enter new password"
+   572→                  />
+   573→                </div>
+   574→                <div className="space-y-2">
+   575→                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+   576→                  <Input
+   577→                    id="confirmPassword"
+   578→                    type="password"
+   579→                    value={confirmPassword}
+   580→                    onChange={(e) => setConfirmPassword(e.target.value)}
+   581→                    placeholder="Confirm new password"
+   582→                  />
+   583→                </div>
+   584→                <div className="flex justify-end">
+   585→                  <Button onClick={changePassword} disabled={saving === 'security'}>
+   586→                    {saving === 'security' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Shield className="h-4 w-4 mr-2" />}
+   587→                    Change Password
+   588→                  </Button>
+   589→                </div>
+   590→              </CardContent>
+   591→            </Card>
+   592→
+   593→            {/* Danger Zone */}
+   594→            <Card className="border-red-200 dark:border-red-900">
+   595→              <CardHeader>
+   596→                <CardTitle className="text-base text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+   597→                <CardDescription>Irreversible actions for your account</CardDescription>
+   598→              </CardHeader>
+   599→              <CardContent>
+   600→                <div className="flex items-center justify-between">
+   601→                  <div>
+   602→                    <p className="text-sm font-medium">Delete Account</p>
+   603→                    <p className="text-xs text-muted-foreground">
+   604→                      Permanently delete your account and all associated data
+   605→                    </p>
+   606→                  </div>
+   607→                  <AlertDialog>
+   608→                    <AlertDialogTrigger asChild>
+   609→                      <Button variant="destructive" size="sm">
+   610→                        Delete Account
+   611→                      </Button>
+   612→                    </AlertDialogTrigger>
+   613→                    <AlertDialogContent>
+   614→                      <AlertDialogHeader>
+   615→                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+   616→                        <AlertDialogDescription>
+   617→                          This action cannot be undone. This will permanently delete your account and
+   618→                          remove all your data from our servers.
+   619→                        </AlertDialogDescription>
+   620→                      </AlertDialogHeader>
+   621→                      <AlertDialogFooter>
+   622→                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+   623→                        <AlertDialogAction
+   624→                          className="bg-red-600 hover:bg-red-700"
+   625→                          onClick={() => {
+   626→                            // In a real app, this would call a delete API
+   627→                            alert('Account deletion is disabled in demo mode.')
+   628→                          }}
+   629→                        >
+   630→                          Delete Account
+   631→                        </AlertDialogAction>
+   632→                      </AlertDialogFooter>
+   633→                    </AlertDialogContent>
+   634→                  </AlertDialog>
+   635→                </div>
+   636→              </CardContent>
+   637→            </Card>
+   638→          </div>
+   639→        </TabsContent>
+   640→
+   641→        {/* ==================== PRIVACY TAB ==================== */}
+   642→        <TabsContent value="privacy">
+   643→          <Card>
+   644→            <CardHeader>
+   645→              <CardTitle className="text-base">Privacy Settings</CardTitle>
+   646→              <CardDescription>Control your data and visibility</CardDescription>
+   647→            </CardHeader>
+   648→            <CardContent className="space-y-6">
+   649→              <div className="flex items-center justify-between">
+   650→                <div>
+   651→                  <p className="text-sm font-medium">Public Portfolio</p>
+   652→                  <p className="text-xs text-muted-foreground">
+   653→                    Allow others to view your portfolio page
+   654→                  </p>
+   655→                </div>
+   656→                <Switch
+   657→                  checked={publicPortfolio}
+   658→                  onCheckedChange={setPublicPortfolio}
+   659→                />
+   660→              </div>
+   661→
+   662→              <Separator />
+   663→
+   664→              <div className="space-y-4">
+   665→                <div>
+   666→                  <p className="text-sm font-medium">Data Sharing Preferences</p>
+   667→                  <p className="text-xs text-muted-foreground">
+   668→                    Control how your data is used within the platform
+   669→                  </p>
+   670→                </div>
+   671→                <div className="flex items-center justify-between">
+   672→                  <div>
+   673→                    <p className="text-sm">Analytics Data</p>
+   674→                    <p className="text-xs text-muted-foreground">Include your activity in team analytics</p>
+   675→                  </div>
+   676→                  <Switch
+   677→                    checked={dataSharing.analytics}
+   678→                    onCheckedChange={(c) => setDataSharing({ ...dataSharing, analytics: c })}
+   679→                  />
+   680→                </div>
+   681→                <Separator />
+   682→                <div className="flex items-center justify-between">
+   683→                  <div>
+   684→                    <p className="text-sm">AI Processing</p>
+   685→                    <p className="text-xs text-muted-foreground">Allow AI to analyze your tasks and provide feedback</p>
+   686→                  </div>
+   687→                  <Switch
+   688→                    checked={dataSharing.ai}
+   689→                    onCheckedChange={(c) => setDataSharing({ ...dataSharing, ai: c })}
+   690→                  />
+   691→                </div>
+   692→                <Separator />
+   693→                <div className="flex items-center justify-between">
+   694→                  <div>
+   695→                    <p className="text-sm">Team Visibility</p>
+   696→                    <p className="text-xs text-muted-foreground">Show your activity to team members</p>
+   697→                  </div>
+   698→                  <Switch
+   699→                    checked={dataSharing.team}
+   700→                    onCheckedChange={(c) => setDataSharing({ ...dataSharing, team: c })}
+   701→                  />
+   702→                </div>
+   703→              </div>
+   704→            </CardContent>
+   705→          </Card>
+   706→        </TabsContent>
+   707→
+   708→        {/* ==================== APPEARANCE TAB ==================== */}
+   709→        <TabsContent value="appearance">
+   710→          <Card>
+   711→            <CardHeader>
+   712→              <CardTitle className="text-base">Appearance</CardTitle>
+   713→              <CardDescription>Customize how the app looks</CardDescription>
+   714→            </CardHeader>
+   715→            <CardContent className="space-y-6">
+   716→              <div>
+   717→                <p className="text-sm font-medium mb-3">Theme</p>
+   718→                <div className="grid grid-cols-3 gap-3">
+   719→                  <button
+   720→                    onClick={() => setTheme('light')}
+   721→                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+   722→                      theme === 'light'
+   723→                        ? 'border-primary bg-primary/5'
+   724→                        : 'border-border hover:border-primary/50'
+   725→                    }`}
+   726→                  >
+   727→                    <Sun className="h-5 w-5" />
+   728→                    <span className="text-xs font-medium">Light</span>
+   729→                  </button>
+   730→                  <button
+   731→                    onClick={() => setTheme('dark')}
+   732→                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+   733→                      theme === 'dark'
+   734→                        ? 'border-primary bg-primary/5'
+   735→                        : 'border-border hover:border-primary/50'
+   736→                    }`}
+   737→                  >
+   738→                    <Moon className="h-5 w-5" />
+   739→                    <span className="text-xs font-medium">Dark</span>
+   740→                  </button>
+   741→                  <button
+   742→                    onClick={() => setTheme('system')}
+   743→                    className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+   744→                      theme === 'system'
+   745→                        ? 'border-primary bg-primary/5'
+   746→                        : 'border-border hover:border-primary/50'
+   747→                    }`}
+   748→                  >
+   749→                    <Monitor className="h-5 w-5" />
+   750→                    <span className="text-xs font-medium">System</span>
+   751→                  </button>
+   752→                </div>
+   753→              </div>
+   754→            </CardContent>
+   755→          </Card>
+   756→        </TabsContent>
+   757→      </Tabs>
+   758→    </div>
+   759→  )
+   760→}
+   761→

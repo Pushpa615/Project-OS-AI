@@ -243,6 +243,7 @@ export function TaskDetailPage({ taskId, userId }: { taskId: string; userId: str
     try {
       setEvidenceSaving(true)
       const body = {
+        userId,
         type: evidenceType,
         title: evidenceTitle,
         description: evidenceDesc,

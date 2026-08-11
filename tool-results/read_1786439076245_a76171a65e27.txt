@@ -1,0 +1,784 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback, useRef } from 'react'
+     4→import { useNavStore } from '@/lib/nav-store'
+     5→import { Button } from '@/components/ui/button'
+     6→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+     7→import { Badge } from '@/components/ui/badge'
+     8→import { Textarea } from '@/components/ui/textarea'
+     9→import { Input } from '@/components/ui/input'
+    10→import { Skeleton } from '@/components/ui/skeleton'
+    11→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    12→import { Separator } from '@/components/ui/separator'
+    13→import {
+    14→  Select,
+    15→  SelectContent,
+    16→  SelectItem,
+    17→  SelectTrigger,
+    18→  SelectValue,
+    19→} from '@/components/ui/select'
+    20→import {
+    21→  Bot,
+    22→  Code2,
+    23→  Bug,
+    24→  FileText,
+    25→  CalendarClock,
+    26→  Send,
+    27→  Loader2,
+    28→  Copy,
+    29→  Check,
+    30→  AlertTriangle,
+    31→  Sparkles,
+    32→  Lightbulb,
+    33→  Clock,
+    34→  Trash2,
+    35→  BarChart3,
+    36→} from 'lucide-react'
+    37→import { formatDistanceToNow, parseISO } from 'date-fns'
+    38→
+    39→interface Project {
+    40→  id: string
+    41→  name: string
+    42→  projectType: string
+    43→  status: string
+    44→}
+    45→
+    46→interface Task {
+    47→  id: string
+    48→  title: string
+    49→  status: string
+    50→}
+    51→
+    52→interface ChatMessage {
+    53→  question: string
+    54→  response: string
+    55→  type: string
+    56→  timestamp: string
+    57→}
+    58→
+    59→interface AIAssistantPageProps {
+    60→  userId: string
+    61→  projectId?: string
+    62→  taskId?: string
+    63→}
+    64→
+    65→const DOC_TYPES = [
+    66→  { value: 'README', label: 'README' },
+    67→  { value: 'Abstract', label: 'Abstract' },
+    68→  { value: 'Project Report', label: 'Project Report' },
+    69→  { value: 'SRS', label: 'SRS (Software Requirements)' },
+    70→  { value: 'API Docs', label: 'API Documentation' },
+    71→  { value: 'Architecture', label: 'Architecture Document' },
+    72→  { value: 'Database', label: 'Database Documentation' },
+    73→  { value: 'Presentation Outline', label: 'Presentation Outline' },
+    74→  { value: 'Demo Script', label: 'Demo Script' },
+    75→]
+    76→
+    77→export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPageProps) {
+    78→  const navigate = useNavStore((s) => s.navigate)
+    79→
+    80→  // Projects & tasks for selectors
+    81→  const [projects, setProjects] = useState<Project[]>([])
+    82→  const [tasks, setTasks] = useState<Task[]>([])
+    83→  const [projectsLoading, setProjectsLoading] = useState(true)
+    84→
+    85→  // Shared AI state
+    86→  const [loading, setLoading] = useState(false)
+    87→  const [error, setError] = useState<string | null>(null)
+    88→
+    89→  // Tab 1: Code Assistant
+    90→  const [codeProjectId, setCodeProjectId] = useState<string>(projectId || '')
+    91→  const [codeTaskId, setCodeTaskId] = useState<string>(taskId || '')
+    92→  const [codeQuestion, setCodeQuestion] = useState('')
+    93→  const [codeHistory, setCodeHistory] = useState<ChatMessage[]>([])
+    94→
+    95→  // Tab 2: Bug Assistant
+    96→  const [bugErrorMessage, setBugErrorMessage] = useState('')
+    97→  const [bugRelevantCode, setBugRelevantCode] = useState('')
+    98→  const [bugExpected, setBugExpected] = useState('')
+    99→  const [bugActual, setBugActual] = useState('')
+   100→  const [bugResponse, setBugResponse] = useState('')
+   101→  const [bugHistory, setBugHistory] = useState<ChatMessage[]>([])
+   102→
+   103→  // Tab 3: Documentation
+   104→  const [docProjectId, setDocProjectId] = useState<string>(projectId || '')
+   105→  const [docType, setDocType] = useState('')
+   106→  const [docResponse, setDocResponse] = useState('')
+   107→  const [copied, setCopied] = useState(false)
+   108→
+   109→  // Tab 4: Deadline Manager
+   110→  const [deadlineProjectId, setDeadlineProjectId] = useState<string>(projectId || '')
+   111→  const [deadlineResponse, setDeadlineResponse] = useState('')
+   112→  const [overdueTasks, setOverdueTasks] = useState<Task[]>([])
+   113→
+   114→  // Fetch projects
+   115→  const fetchProjects = useCallback(async () => {
+   116→    try {
+   117→      const res = await fetch(`/api/projects?userId=${userId}`)
+   118→      const json = await res.json()
+   119→      if (json.data) setProjects(json.data)
+   120→    } catch {
+   121→      // silent
+   122→    } finally {
+   123→      setProjectsLoading(false)
+   124→    }
+   125→  }, [userId])
+   126→
+   127→  // Fetch tasks for a project
+   128→  const fetchTasks = useCallback(async (pid: string) => {
+   129→    if (!pid) {
+   130→      setTasks([])
+   131→      return
+   132→    }
+   133→    try {
+   134→      const res = await fetch(`/api/tasks?projectId=${pid}`)
+   135→      const json = await res.json()
+   136→      if (json.data) setTasks(json.data)
+   137→    } catch {
+   138→      // silent
+   139→    }
+   140→  }, [])
+   141→
+   142→  // Fetch overdue tasks
+   143→  const fetchOverdue = useCallback(async (pid: string) => {
+   144→    if (!pid) return
+   145→    try {
+   146→      const res = await fetch(`/api/tasks?projectId=${pid}&status=overdue`)
+   147→      const json = await res.json()
+   148→      if (json.data) setOverdueTasks(json.data)
+   149→    } catch {
+   150→      // silent
+   151→    }
+   152→  }, [])
+   153→
+   154→  useEffect(() => {
+   155→    fetchProjects()
+   156→  }, [fetchProjects])
+   157→
+   158→  useEffect(() => {
+   159→    if (codeProjectId) fetchTasks(codeProjectId)
+   160→  }, [codeProjectId, fetchTasks])
+   161→
+   162→  useEffect(() => {
+   163→    if (deadlineProjectId) fetchOverdue(deadlineProjectId)
+   164→  }, [deadlineProjectId, fetchOverdue])
+   165→
+   166→  // AI request helper
+   167→  const callAI = useCallback(
+   168→    async (type: string, question: string, context: string = '') => {
+   169→      setLoading(true)
+   170→      setError(null)
+   171→      try {
+   172→        const res = await fetch('/api/ai/chat', {
+   173→          method: 'POST',
+   174→          headers: { 'Content-Type': 'application/json' },
+   175→          body: JSON.stringify({
+   176→            userId,
+   177→            projectId: projectId || undefined,
+   178→            taskId: taskId || undefined,
+   179→            type,
+   180→            question,
+   181→            context,
+   182→          }),
+   183→        })
+   184→        const json = await res.json()
+   185→        if (json.error) {
+   186→          setError(json.error)
+   187→          return null
+   188→        }
+   189→        return json.data.response as string
+   190→      } catch {
+   191→        setError('AI request failed. Please try again.')
+   192→        return null
+   193→      } finally {
+   194→        setLoading(false)
+   195→      }
+   196→    },
+   197→    [userId, projectId, taskId]
+   198→  )
+   199→
+   200→  // Code assistant submit
+   201→  const handleCodeSubmit = async () => {
+   202→    if (!codeQuestion.trim()) return
+   203→    const response = await callAI('code_help', codeQuestion)
+   204→    if (response) {
+   205→      setCodeHistory((prev) => [
+   206→        { question: codeQuestion, response, type: 'code_help', timestamp: new Date().toISOString() },
+   207→        ...prev,
+   208→      ])
+   209→      setCodeQuestion('')
+   210→    }
+   211→  }
+   212→
+   213→  // Bug assistant submit
+   214→  const handleBugSubmit = async () => {
+   215→    if (!bugErrorMessage.trim()) return
+   216→    const context = [
+   217→      bugRelevantCode ? `Relevant Code:\n${bugRelevantCode}` : '',
+   218→      bugExpected ? `Expected Behavior: ${bugExpected}` : '',
+   219→      bugActual ? `Actual Behavior: ${bugActual}` : '',
+   220→    ]
+   221→      .filter(Boolean)
+   222→      .join('\n\n')
+   223→
+   224→    const response = await callAI('bug_help', bugErrorMessage, context)
+   225→    if (response) {
+   226→      setBugHistory((prev) => [
+   227→        { question: bugErrorMessage, response, type: 'bug_help', timestamp: new Date().toISOString() },
+   228→        ...prev,
+   229→      ])
+   230→      setBugResponse(response)
+   231→      setBugErrorMessage('')
+   232→      setBugRelevantCode('')
+   233→      setBugExpected('')
+   234→      setBugActual('')
+   235→    }
+   236→  }
+   237→
+   238→  // Documentation submit
+   239→  const handleDocGenerate = async () => {
+   240→    if (!docProjectId || !docType) return
+   241→    const question = `Generate a ${docType} document for this project. Include all relevant sections, be comprehensive and professional.`
+   242→    const response = await callAI('general', question)
+   243→    if (response) {
+   244→      setDocResponse(response)
+   245→    }
+   246→  }
+   247→
+   248→  // Deadline manager submit
+   249→  const handleDeadlineAnalyze = async () => {
+   250→    if (!deadlineProjectId) return
+   251→    const overdueInfo = overdueTasks
+   252→      .map((t) => ` - ${t.title} (${t.status})`)
+   253→      .join('\n')
+   254→    const question = `Analyze the current project timeline and provide: 1) Timeline status assessment, 2) Overdue task analysis, 3) Risk identification, 4) Specific AI-powered recommendations for getting back on track.\n\nOverdue tasks:\n${overdueInfo || 'None'}`
+   255→    const response = await callAI('general', question)
+   256→    if (response) {
+   257→      setDeadlineResponse(response)
+   258→    }
+   259→  }
+   260→
+   261→  // Copy to clipboard
+   262→  const handleCopy = (text: string) => {
+   263→    navigator.clipboard.writeText(text)
+   264→    setCopied(true)
+   265→    setTimeout(() => setCopied(false), 2000)
+   266→  }
+   267→
+   268→  const clearHistory = (setter: React.Dispatch<React.SetStateAction<ChatMessage[]>>) => {
+   269→    setter([])
+   270→  }
+   271→
+   272→  return (
+   273→    <div className="min-h-screen bg-background">
+   274→      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+   275→        {/* Header */}
+   276→        <div className="flex items-center gap-3">
+   277→          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+   278→            <Bot className="h-5 w-5 text-primary" />
+   279→          </div>
+   280→          <div>
+   281→            <h1 className="text-2xl font-bold tracking-tight">AI Assistant</h1>
+   282→            <p className="text-sm text-muted-foreground">
+   283→              Powered by AI to help you build better
+   284→            </p>
+   285→          </div>
+   286→        </div>
+   287→
+   288→        {/* Tabs */}
+   289→        <Tabs defaultValue="code" className="space-y-4">
+   290→          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+   291→            <TabsTrigger value="code" className="gap-1.5 text-xs sm:text-sm">
+   292→              <Code2 className="h-3.5 w-3.5" />
+   293→              <span className="hidden sm:inline">Code</span>
+   294→            </TabsTrigger>
+   295→            <TabsTrigger value="bug" className="gap-1.5 text-xs sm:text-sm">
+   296→              <Bug className="h-3.5 w-3.5" />
+   297→              <span className="hidden sm:inline">Bug</span>
+   298→            </TabsTrigger>
+   299→            <TabsTrigger value="docs" className="gap-1.5 text-xs sm:text-sm">
+   300→              <FileText className="h-3.5 w-3.5" />
+   301→              <span className="hidden sm:inline">Docs</span>
+   302→            </TabsTrigger>
+   303→            <TabsTrigger value="deadline" className="gap-1.5 text-xs sm:text-sm">
+   304→              <CalendarClock className="h-3.5 w-3.5" />
+   305→              <span className="hidden sm:inline">Deadlines</span>
+   306→            </TabsTrigger>
+   307→          </TabsList>
+   308→
+   309→          {/* =========== TAB 1: Code Assistant =========== */}
+   310→          <TabsContent value="code" className="space-y-4">
+   311→            <Card>
+   312→              <CardHeader className="pb-3">
+   313→                <CardTitle className="text-base font-semibold flex items-center gap-2">
+   314→                  <Code2 className="h-4 w-4 text-emerald-500" />
+   315→                  Code Assistant
+   316→                </CardTitle>
+   317→              </CardHeader>
+   318→              <CardContent className="space-y-4">
+   319→                {/* Project selector */}
+   320→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   321→                  <div className="space-y-1.5">
+   322→                    <label className="text-xs font-medium text-muted-foreground">Project</label>
+   323→                    <Select value={codeProjectId} onValueChange={(v) => setCodeProjectId(v)}>
+   324→                      <SelectTrigger className="h-9">
+   325→                        <SelectValue placeholder="Select project" />
+   326→                      </SelectTrigger>
+   327→                      <SelectContent>
+   328→                        {projects.map((p) => (
+   329→                          <SelectItem key={p.id} value={p.id}>
+   330→                            {p.name}
+   331→                          </SelectItem>
+   332→                        ))}
+   333→                      </SelectContent>
+   334→                    </Select>
+   335→                  </div>
+   336→                  {codeProjectId && (
+   337→                    <div className="space-y-1.5">
+   338→                      <label className="text-xs font-medium text-muted-foreground">Task (optional)</label>
+   339→                      <Select value={codeTaskId} onValueChange={(v) => setCodeTaskId(v)}>
+   340→                        <SelectTrigger className="h-9">
+   341→                          <SelectValue placeholder="Select task" />
+   342→                        </SelectTrigger>
+   343→                        <SelectContent>
+   344→                          {tasks.map((t) => (
+   345→                            <SelectItem key={t.id} value={t.id}>
+   346→                              {t.title}
+   347→                            </SelectItem>
+   348→                          ))}
+   349→                        </SelectContent>
+   350→                      </Select>
+   351→                    </div>
+   352→                  )}
+   353→                </div>
+   354→
+   355→                <div className="space-y-1.5">
+   356→                  <label className="text-xs font-medium text-muted-foreground">Ask for help</label>
+   357→                  <Textarea
+   358→                    placeholder="Describe what you need help with..."
+   359→                    value={codeQuestion}
+   360→                    onChange={(e) => setCodeQuestion(e.target.value)}
+   361→                    rows={3}
+   362→                    onKeyDown={(e) => {
+   363→                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCodeSubmit()
+   364→                    }}
+   365→                  />
+   366→                </div>
+   367→
+   368→                {error && (
+   369→                  <p className="text-sm text-destructive flex items-center gap-1">
+   370→                    <AlertTriangle className="h-3 w-3" /> {error}
+   371→                  </p>
+   372→                )}
+   373→
+   374→                <Button onClick={handleCodeSubmit} disabled={loading || !codeQuestion.trim()}>
+   375→                  {loading ? (
+   376→                    <>
+   377→                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+   378→                      Thinking...
+   379→                    </>
+   380→                  ) : (
+   381→                    <>
+   382→                      <Send className="h-4 w-4 mr-2" />
+   383→                      Get Help
+   384→                    </>
+   385→                  )}
+   386→                </Button>
+   387→              </CardContent>
+   388→            </Card>
+   389→
+   390→            {/* Code history */}
+   391→            {codeHistory.length > 0 && (
+   392→              <div className="space-y-3">
+   393→                <div className="flex items-center justify-between">
+   394→                  <h3 className="text-sm font-semibold text-muted-foreground">History</h3>
+   395→                  <Button
+   396→                    variant="ghost"
+   397→                    size="sm"
+   398→                    className="text-xs h-7"
+   399→                    onClick={() => clearHistory(setCodeHistory)}
+   400→                  >
+   401→                    <Trash2 className="h-3 w-3 mr-1" /> Clear
+   402→                  </Button>
+   403→                </div>
+   404→                {codeHistory.map((msg, i) => (
+   405→                  <Card key={i} className="overflow-hidden">
+   406→                    <CardContent className="p-4 space-y-3">
+   407→                      <div className="flex items-start gap-2">
+   408→                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+   409→                          <span className="text-xs font-medium text-primary">You</span>
+   410→                        </div>
+   411→                        <div className="flex-1 min-w-0">
+   412→                          <p className="text-sm font-medium">{msg.question}</p>
+   413→                          <p className="text-[10px] text-muted-foreground mt-0.5">
+   414→                            {formatDistanceToNow(parseISO(msg.timestamp), { addSuffix: true })}
+   415→                          </p>
+   416→                        </div>
+   417→                      </div>
+   418→                      <Separator />
+   419→                      <div className="flex items-start gap-2">
+   420→                        <div className="h-7 w-7 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center shrink-0 mt-0.5">
+   421→                          <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+   422→                        </div>
+   423→                        <div className="flex-1 min-w-0">
+   424→                          <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+   425→                            {msg.response}
+   426→                          </p>
+   427→                        </div>
+   428→                      </div>
+   429→                    </CardContent>
+   430→                  </Card>
+   431→                ))}
+   432→              </div>
+   433→            )}
+   434→          </TabsContent>
+   435→
+   436→          {/* =========== TAB 2: Bug Assistant =========== */}
+   437→          <TabsContent value="bug" className="space-y-4">
+   438→            <Card>
+   439→              <CardHeader className="pb-3">
+   440→                <CardTitle className="text-base font-semibold flex items-center gap-2">
+   441→                  <Bug className="h-4 w-4 text-red-500" />
+   442→                  Bug Assistant
+   443→                </CardTitle>
+   444→              </CardHeader>
+   445→              <CardContent className="space-y-4">
+   446→                <div className="space-y-1.5">
+   447→                  <label className="text-xs font-medium text-muted-foreground">Error Message</label>
+   448→                  <Textarea
+   449→                    placeholder="Paste the error message or stack trace..."
+   450→                    value={bugErrorMessage}
+   451→                    onChange={(e) => setBugErrorMessage(e.target.value)}
+   452→                    rows={3}
+   453→                  />
+   454→                </div>
+   455→
+   456→                <div className="space-y-1.5">
+   457→                  <label className="text-xs font-medium text-muted-foreground">
+   458→                    Relevant Code (optional)
+   459→                  </label>
+   460→                  <Textarea
+   461→                    placeholder="Paste the code where the bug occurs..."
+   462→                    value={bugRelevantCode}
+   463→                    onChange={(e) => setBugRelevantCode(e.target.value)}
+   464→                    rows={4}
+   465→                    className="font-mono text-xs"
+   466→                  />
+   467→                </div>
+   468→
+   469→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   470→                  <div className="space-y-1.5">
+   471→                    <label className="text-xs font-medium text-muted-foreground">Expected Behavior</label>
+   472→                    <Input
+   473→                      placeholder="What should happen?"
+   474→                      value={bugExpected}
+   475→                      onChange={(e) => setBugExpected(e.target.value)}
+   476→                    />
+   477→                  </div>
+   478→                  <div className="space-y-1.5">
+   479→                    <label className="text-xs font-medium text-muted-foreground">Actual Behavior</label>
+   480→                    <Input
+   481→                      placeholder="What actually happens?"
+   482→                      value={bugActual}
+   483→                      onChange={(e) => setBugActual(e.target.value)}
+   484→                    />
+   485→                  </div>
+   486→                </div>
+   487→
+   488→                {error && (
+   489→                  <p className="text-sm text-destructive flex items-center gap-1">
+   490→                    <AlertTriangle className="h-3 w-3" /> {error}
+   491→                  </p>
+   492→                )}
+   493→
+   494→                <Button onClick={handleBugSubmit} disabled={loading || !bugErrorMessage.trim()}>
+   495→                  {loading ? (
+   496→                    <>
+   497→                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+   498→                      Analyzing...
+   499→                    </>
+   500→                  ) : (
+   501→                    <>
+   502→                      <Bug className="h-4 w-4 mr-2" />
+   503→                      Analyze Bug
+   504→                    </>
+   505→                  )}
+   506→                </Button>
+   507→              </CardContent>
+   508→            </Card>
+   509→
+   510→            {/* Bug response */}
+   511→            {bugResponse && (
+   512→              <Card className="border-red-200 dark:border-red-900/30">
+   513→                <CardContent className="p-4">
+   514→                  <div className="flex items-start gap-3">
+   515→                    <div className="h-8 w-8 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+   516→                      <Bug className="h-4 w-4 text-red-600 dark:text-red-400" />
+   517→                    </div>
+   518→                    <div className="flex-1 min-w-0">
+   519→                      <p className="text-sm font-medium mb-2">Bug Analysis</p>
+   520→                      <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+   521→                        {bugResponse}
+   522→                      </p>
+   523→                    </div>
+   524→                  </div>
+   525→                </CardContent>
+   526→              </Card>
+   527→            )}
+   528→
+   529→            {/* Bug history */}
+   530→            {bugHistory.length > 0 && (
+   531→              <div className="space-y-3">
+   532→                <div className="flex items-center justify-between">
+   533→                  <h3 className="text-sm font-semibold text-muted-foreground">History</h3>
+   534→                  <Button
+   535→                    variant="ghost"
+   536→                    size="sm"
+   537→                    className="text-xs h-7"
+   538→                    onClick={() => clearHistory(setBugHistory)}
+   539→                  >
+   540→                    <Trash2 className="h-3 w-3 mr-1" /> Clear
+   541→                  </Button>
+   542→                </div>
+   543→                {bugHistory.map((msg, i) => (
+   544→                  <Card key={i} className="overflow-hidden">
+   545→                    <CardContent className="p-4 space-y-3">
+   546→                      <div className="flex items-start gap-2">
+   547→                        <div className="h-7 w-7 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center shrink-0 mt-0.5">
+   548→                          <Bug className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+   549→                        </div>
+   550→                        <div className="flex-1 min-w-0">
+   551→                          <p className="text-sm font-medium line-clamp-2">{msg.question}</p>
+   552→                          <p className="text-[10px] text-muted-foreground mt-0.5">
+   553→                            {formatDistanceToNow(parseISO(msg.timestamp), { addSuffix: true })}
+   554→                          </p>
+   555→                        </div>
+   556→                      </div>
+   557→                      <Separator />
+   558→                      <div className="flex items-start gap-2">
+   559→                        <div className="h-7 w-7 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center shrink-0 mt-0.5">
+   560→                          <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+   561→                        </div>
+   562→                        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+   563→                          {msg.response}
+   564→                        </p>
+   565→                      </div>
+   566→                    </CardContent>
+   567→                  </Card>
+   568→                ))}
+   569→              </div>
+   570→            )}
+   571→          </TabsContent>
+   572→
+   573→          {/* =========== TAB 3: Documentation Generator =========== */}
+   574→          <TabsContent value="docs" className="space-y-4">
+   575→            <Card>
+   576→              <CardHeader className="pb-3">
+   577→                <CardTitle className="text-base font-semibold flex items-center gap-2">
+   578→                  <FileText className="h-4 w-4 text-violet-500" />
+   579→                  Documentation Generator
+   580→                </CardTitle>
+   581→              </CardHeader>
+   582→              <CardContent className="space-y-4">
+   583→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   584→                  <div className="space-y-1.5">
+   585→                    <label className="text-xs font-medium text-muted-foreground">Project</label>
+   586→                    <Select value={docProjectId} onValueChange={(v) => setDocProjectId(v)}>
+   587→                      <SelectTrigger className="h-9">
+   588→                        <SelectValue placeholder="Select project" />
+   589→                      </SelectTrigger>
+   590→                      <SelectContent>
+   591→                        {projects.map((p) => (
+   592→                          <SelectItem key={p.id} value={p.id}>
+   593→                            {p.name}
+   594→                          </SelectItem>
+   595→                        ))}
+   596→                      </SelectContent>
+   597→                    </Select>
+   598→                  </div>
+   599→                  <div className="space-y-1.5">
+   600→                    <label className="text-xs font-medium text-muted-foreground">Document Type</label>
+   601→                    <Select value={docType} onValueChange={(v) => setDocType(v)}>
+   602→                      <SelectTrigger className="h-9">
+   603→                        <SelectValue placeholder="Select type" />
+   604→                      </SelectTrigger>
+   605→                      <SelectContent>
+   606→                        {DOC_TYPES.map((dt) => (
+   607→                          <SelectItem key={dt.value} value={dt.value}>
+   608→                            {dt.label}
+   609→                          </SelectItem>
+   610→                        ))}
+   611→                      </SelectContent>
+   612→                    </Select>
+   613→                  </div>
+   614→                </div>
+   615→
+   616→                {error && (
+   617→                  <p className="text-sm text-destructive flex items-center gap-1">
+   618→                    <AlertTriangle className="h-3 w-3" /> {error}
+   619→                  </p>
+   620→                )}
+   621→
+   622→                <Button
+   623→                  onClick={handleDocGenerate}
+   624→                  disabled={loading || !docProjectId || !docType}
+   625→                >
+   626→                  {loading ? (
+   627→                    <>
+   628→                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+   629→                      Generating...
+   630→                    </>
+   631→                  ) : (
+   632→                    <>
+   633→                      <FileText className="h-4 w-4 mr-2" />
+   634→                      Generate
+   635→                    </>
+   636→                  )}
+   637→                </Button>
+   638→              </CardContent>
+   639→            </Card>
+   640→
+   641→            {/* Generated doc */}
+   642→            {docResponse && (
+   643→              <Card>
+   644→                <CardHeader className="pb-3">
+   645→                  <div className="flex items-center justify-between">
+   646→                    <CardTitle className="text-sm font-semibold">
+   647→                      Generated: {docType}
+   648→                    </CardTitle>
+   649→                    <Button
+   650→                      variant="outline"
+   651→                      size="sm"
+   652→                      className="h-7 text-xs"
+   653→                      onClick={() => handleCopy(docResponse)}
+   654→                    >
+   655→                      {copied ? (
+   656→                        <>
+   657→                          <Check className="h-3 w-3 mr-1" /> Copied
+   658→                        </>
+   659→                      ) : (
+   660→                        <>
+   661→                          <Copy className="h-3 w-3 mr-1" /> Copy
+   662→                        </>
+   663→                      )}
+   664→                    </Button>
+   665→                  </div>
+   666→                </CardHeader>
+   667→                <CardContent>
+   668→                  <div className="bg-muted/50 rounded-lg p-4 max-h-[500px] overflow-y-auto">
+   669→                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
+   670→                      {docResponse}
+   671→                    </pre>
+   672→                  </div>
+   673→                </CardContent>
+   674→              </Card>
+   675→            )}
+   676→          </TabsContent>
+   677→
+   678→          {/* =========== TAB 4: Smart Deadline Manager =========== */}
+   679→          <TabsContent value="deadline" className="space-y-4">
+   680→            <Card>
+   681→              <CardHeader className="pb-3">
+   682→                <CardTitle className="text-base font-semibold flex items-center gap-2">
+   683→                  <CalendarClock className="h-4 w-4 text-amber-500" />
+   684→                  Smart Deadline Manager
+   685→                </CardTitle>
+   686→              </CardHeader>
+   687→              <CardContent className="space-y-4">
+   688→                <div className="space-y-1.5">
+   689→                  <label className="text-xs font-medium text-muted-foreground">Project</label>
+   690→                  <Select value={deadlineProjectId} onValueChange={(v) => setDeadlineProjectId(v)}>
+   691→                    <SelectTrigger className="h-9 w-full sm:w-64">
+   692→                      <SelectValue placeholder="Select project" />
+   693→                    </SelectTrigger>
+   694→                    <SelectContent>
+   695→                      {projects.map((p) => (
+   696→                        <SelectItem key={p.id} value={p.id}>
+   697→                          {p.name}
+   698→                        </SelectItem>
+   699→                      ))}
+   700→                    </SelectContent>
+   701→                  </Select>
+   702→                </div>
+   703→
+   704→                {error && (
+   705→                  <p className="text-sm text-destructive flex items-center gap-1">
+   706→                    <AlertTriangle className="h-3 w-3" /> {error}
+   707→                  </p>
+   708→                )}
+   709→
+   710→                <Button
+   711→                  onClick={handleDeadlineAnalyze}
+   712→                  disabled={loading || !deadlineProjectId}
+   713→                >
+   714→                  {loading ? (
+   715→                    <>
+   716→                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+   717→                      Analyzing...
+   718→                    </>
+   719→                  ) : (
+   720→                    <>
+   721→                      <BarChart3 className="h-4 w-4 mr-2" />
+   722→                      Analyze Timeline
+   723→                    </>
+   724→                  )}
+   725→                </Button>
+   726→              </CardContent>
+   727→            </Card>
+   728→
+   729→            {/* Overdue tasks */}
+   730→            {deadlineProjectId && overdueTasks.length > 0 && (
+   731→              <Card>
+   732→                <CardHeader className="pb-3">
+   733→                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   734→                    <AlertTriangle className="h-4 w-4 text-red-500" />
+   735→                    Overdue Tasks ({overdueTasks.length})
+   736→                  </CardTitle>
+   737→                </CardHeader>
+   738→                <CardContent>
+   739→                  <div className="space-y-2">
+   740→                    {overdueTasks.map((task) => (
+   741→                      <button
+   742→                        key={task.id}
+   743→                        onClick={() => navigate('task-detail', { id: task.id })}
+   744→                        className="w-full text-left p-2.5 rounded-lg border border-red-200 dark:border-red-900/30 hover:bg-muted/50 transition-colors"
+   745→                      >
+   746→                        <div className="flex items-center gap-2">
+   747→                          <Clock className="h-3.5 w-3.5 text-red-500 shrink-0" />
+   748→                          <span className="text-sm font-medium truncate">{task.title}</span>
+   749→                          <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 dark:text-red-400 shrink-0">
+   750→                            {task.status.replace(/_/g, ' ')}
+   751→                          </Badge>
+   752→                        </div>
+   753→                      </button>
+   754→                    ))}
+   755→                  </div>
+   756→                </CardContent>
+   757→              </Card>
+   758→            )}
+   759→
+   760→            {/* AI deadline response */}
+   761→            {deadlineResponse && (
+   762→              <Card>
+   763→                <CardHeader className="pb-3">
+   764→                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   765→                    <Lightbulb className="h-4 w-4 text-amber-500" />
+   766→                    AI Recommendations
+   767→                  </CardTitle>
+   768→                </CardHeader>
+   769→                <CardContent>
+   770→                  <div className="bg-muted/50 rounded-lg p-4">
+   771→                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+   772→                      {deadlineResponse}
+   773→                    </p>
+   774→                  </div>
+   775→                </CardContent>
+   776→              </Card>
+   777→            )}
+   778→          </TabsContent>
+   779→        </Tabs>
+   780→      </div>
+   781→    </div>
+   782→  )
+   783→}
+   784→

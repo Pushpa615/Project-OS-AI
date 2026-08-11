@@ -52,12 +52,21 @@ export async function POST(req: NextRequest) {
 
     const { userId, provider, displayName, url } = parsed.data
 
-    // Check user exists
-    const user = await db.user.findUnique({ where: { id: userId } })
+    // Check user exists and has a profile (required for ConnectedAccount FK)
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    })
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
+      )
+    }
+    if (!user.profile) {
+      return NextResponse.json(
+        { error: 'User profile not found. Please complete onboarding first.' },
+        { status: 400 }
       )
     }
 

@@ -1,0 +1,703 @@
+   275→  // Verify with AI
+   276→  async function handleVerify() {
+   277→    try {
+   278→      setVerifying(true)
+   279→      const res = await fetch(`/api/tasks/${taskId}/verify`, {
+   280→        method: 'POST',
+   281→        headers: { 'Content-Type': 'application/json' },
+   282→        body: JSON.stringify({ userId }),
+   283→      })
+   284→      const json = await res.json()
+   285→      if (!res.ok) throw new Error(json.error || 'Verification failed')
+   286→      // Re-fetch task
+   287→      const taskRes = await fetch(`/api/tasks/${taskId}`)
+   288→      const taskJson = await taskRes.json()
+   289→      if (taskRes.ok) setTask(taskJson.data)
+   290→    } catch (err) {
+   291→      setError(err instanceof Error ? err.message : 'Verification failed')
+   292→    } finally {
+   293→      setVerifying(false)
+   294→    }
+   295→  }
+   296→
+   297→  // Add comment
+   298→  async function handleAddComment() {
+   299→    if (!commentInput.trim()) return
+   300→    try {
+   301→      setSubmittingComment(true)
+   302→      const res = await fetch('/api/comments', {
+   303→        method: 'POST',
+   304→        headers: { 'Content-Type': 'application/json' },
+   305→        body: JSON.stringify({
+   306→          userId,
+   307→          taskId,
+   308→          content: commentInput.trim(),
+   309→        }),
+   310→      })
+   311→      const json = await res.json()
+   312→      if (!res.ok) throw new Error(json.error || 'Failed to add comment')
+   313→      setCommentInput('')
+   314→      const newComment = json.data
+   315→      setComments((prev) => [...prev, newComment])
+   316→    } catch (err) {
+   317→      setError(err instanceof Error ? err.message : 'Failed to add comment')
+   318→    } finally {
+   319→      setSubmittingComment(false)
+   320→    }
+   321→  }
+   322→
+   323→  // AI Chat
+   324→  async function handleAiChat() {
+   325→    if (!aiQuestion.trim()) return
+   326→    const question = aiQuestion.trim()
+   327→    setAiQuestion('')
+   328→    setAiMessages((prev) => [...prev, { role: 'user', content: question }])
+   329→    setAiLoading(true)
+   330→    try {
+   331→      const res = await fetch('/api/ai/chat', {
+   332→        method: 'POST',
+   333→        headers: { 'Content-Type': 'application/json' },
+   334→        body: JSON.stringify({
+   335→          userId,
+   336→          taskId,
+   337→          projectId: task?.project.id,
+   338→          type: 'code_help',
+   339→          question,
+   340→        }),
+   341→      })
+   342→      const json = await res.json()
+   343→      if (!res.ok) throw new Error(json.error || 'AI chat failed')
+   344→      setAiMessages((prev) => [...prev, { role: 'assistant', content: json.data?.response || 'No response' }])
+   345→    } catch (err) {
+   346→      setAiMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' }])
+   347→    } finally {
+   348→      setAiLoading(false)
+   349→    }
+   350→  }
+   351→
+   352→  // ==================== LOADING STATE ====================
+   353→  if (loading) {
+   354→    return (
+   355→      <div className="min-h-screen bg-background">
+   356→        <div className="border-b bg-background">
+   357→          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+   358→            <Skeleton className="h-8 w-8 rounded-md" />
+   359→            <Skeleton className="h-6 w-64" />
+   360→          </div>
+   361→        </div>
+   362→        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+   363→          {Array.from({ length: 6 }).map((_, i) => (
+   364→            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+   365→          ))}
+   366→        </div>
+   367→      </div>
+   368→    )
+   369→  }
+   370→
+   371→  if (error && !task) {
+   372→    return (
+   373→      <div className="min-h-screen bg-background flex items-center justify-center">
+   374→        <div className="text-center space-y-4 p-4">
+   375→          <p className="text-destructive">{error}</p>
+   376→          <Button variant="outline" onClick={() => navigate('tasks')} className="gap-2">
+   377→            <ArrowLeft className="h-4 w-4" />
+   378→            Back to Tasks
+   379→          </Button>
+   380→        </div>
+   381→      </div>
+   382→    )
+   383→  }
+   384→
+   385→  if (!task) return null
+   386→
+   387→  const pConfig = priorityConfig[task.priority] || priorityConfig.medium
+   388→
+   389→  return (
+   390→    <div className="min-h-screen bg-background">
+   391→      {/* Header */}
+   392→      <div className="border-b bg-background sticky top-0 z-40">
+   393→        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+   394→          <div className="flex items-center gap-3 min-w-0">
+   395→            <Button variant="ghost" size="icon" onClick={() => task.project ? navigate('project-detail', { id: task.project.id }) : navigate('tasks')}>
+   396→              <ArrowLeft className="h-4 w-4" />
+   397→            </Button>
+   398→            <div className="min-w-0">
+   399→              <div className="flex items-center gap-2 flex-wrap">
+   400→                <h1 className="text-lg font-bold truncate">{task.title}</h1>
+   401→                <Badge variant="outline" className={`text-[10px] px-2 py-0 ${statusColors[task.status] || ''}`}>
+   402→                  {task.status.replace(/_/g, ' ')}
+   403→                </Badge>
+   404→                <Badge variant="outline" className={`text-[10px] px-2 py-0 ${pConfig.color}`}>
+   405→                  {pConfig.label}
+   406→                </Badge>
+   407→              </div>
+   408→            </div>
+   409→          </div>
+   410→        </div>
+   411→      </div>
+   412→
+   413→      {/* Content */}
+   414→      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+   415→        {error && (
+   416→          <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+   417→            {error}
+   418→          </div>
+   419→        )}
+   420→
+   421→        <Tabs value={activeTab} onValueChange={setActiveTab}>
+   422→          <TabsList className="w-full flex overflow-x-auto mb-6 bg-muted p-1 rounded-lg h-auto gap-1">
+   423→            <TabsTrigger value="details" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   424→              <FileText className="h-3.5 w-3.5 hidden sm:block" />
+   425→              Details
+   426→            </TabsTrigger>
+   427→            <TabsTrigger value="evidence" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   428→              <ImageIcon className="h-3.5 w-3.5 hidden sm:block" />
+   429→              Evidence
+   430→            </TabsTrigger>
+   431→            <TabsTrigger value="ai-help" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   432→              <Brain className="h-3.5 w-3.5 hidden sm:block" />
+   433→              AI Help
+   434→            </TabsTrigger>
+   435→            <TabsTrigger value="comments" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   436→              <MessageSquare className="h-3.5 w-3.5 hidden sm:block" />
+   437→              Comments
+   438→              {comments.length > 0 && (
+   439→                <Badge variant="secondary" className="h-4 w-4 p-0 text-[10px] flex items-center justify-center">
+   440→                  {comments.length}
+   441→                </Badge>
+   442→              )}
+   443→            </TabsTrigger>
+   444→          </TabsList>
+   445→
+   446→          {/* ==================== DETAILS TAB ==================== */}
+   447→          <TabsContent value="details" className="space-y-6">
+   448→            {/* Description */}
+   449→            <Card>
+   450→              <CardHeader>
+   451→                <CardTitle className="text-base">Description</CardTitle>
+   452→              </CardHeader>
+   453→              <CardContent>
+   454→                {task.description ? (
+   455→                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+   456→                    {task.description}
+   457→                  </p>
+   458→                ) : (
+   459→                  <p className="text-sm text-muted-foreground italic">No description provided.</p>
+   460→                )}
+   461→              </CardContent>
+   462→            </Card>
+   463→
+   464→            {/* Editable details */}
+   465→            <Card>
+   466→              <CardHeader>
+   467→                <CardTitle className="text-base">Task Details</CardTitle>
+   468→              </CardHeader>
+   469→              <CardContent className="space-y-5">
+   470→                {/* Assigned To */}
+   471→                <div className="flex items-center justify-between">
+   472→                  <div className="flex items-center gap-2 text-sm">
+   473→                    <User className="h-4 w-4 text-muted-foreground" />
+   474→                    <span className="text-muted-foreground">Assigned To</span>
+   475→                  </div>
+   476→                  <div className="flex items-center gap-2">
+   477→                    {task.assignee ? (
+   478→                      <>
+   479→                        <Avatar className="h-6 w-6">
+   480→                          <AvatarImage src={task.assignee.avatar || ''} />
+   481→                          <AvatarFallback className="text-[10px]">
+   482→                            {task.assignee.name?.charAt(0).toUpperCase() || task.assignee.email.charAt(0).toUpperCase()}
+   483→                          </AvatarFallback>
+   484→                        </Avatar>
+   485→                        <span className="text-sm font-medium">{task.assignee.name || task.assignee.email}</span>
+   486→                      </>
+   487→                    ) : (
+   488→                      <span className="text-sm text-muted-foreground">Unassigned</span>
+   489→                    )}
+   490→                  </div>
+   491→                </div>
+   492→
+   493→                <Separator />
+   494→
+   495→                {/* Milestone */}
+   496→                <div className="flex items-center justify-between">
+   497→                  <div className="flex items-center gap-2 text-sm">
+   498→                    <Target className="h-4 w-4 text-muted-foreground" />
+   499→                    <span className="text-muted-foreground">Milestone</span>
+   500→                  </div>
+   501→                  <span className="text-sm font-medium">
+   502→                    {task.milestone ? task.milestone.title : 'None'}
+   503→                  </span>
+   504→                </div>
+   505→
+   506→                <Separator />
+   507→
+   508→                {/* Dates */}
+   509→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   510→                  <div className="flex items-center gap-2 text-sm">
+   511→                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+   512→                    <span className="text-muted-foreground">Start:</span>
+   513→                    <span className="font-medium">{formatDate(task.startDate)}</span>
+   514→                  </div>
+   515→                  <div className="flex items-center gap-2 text-sm">
+   516→                    <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+   517→                    <span className="text-muted-foreground">Due:</span>
+   518→                    <span className="font-medium">{formatDate(task.dueDate)}</span>
+   519→                  </div>
+   520→                </div>
+   521→
+   522→                <Separator />
+   523→
+   524→                {/* Hours */}
+   525→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   526→                  <div className="space-y-1.5">
+   527→                    <Label className="text-xs text-muted-foreground">Estimated Hours</Label>
+   528→                    <Input
+   529→                      type="number"
+   530→                      placeholder="0"
+   531→                      value={editEstimated}
+   532→                      onChange={(e) => setEditEstimated(e.target.value)}
+   533→                      className="h-9"
+   534→                    />
+   535→                  </div>
+   536→                  <div className="space-y-1.5">
+   537→                    <Label className="text-xs text-muted-foreground">Actual Hours</Label>
+   538→                    <Input
+   539→                      type="number"
+   540→                      placeholder="0"
+   541→                      value={editHours}
+   542→                      onChange={(e) => setEditHours(e.target.value)}
+   543→                      className="h-9"
+   544→                    />
+   545→                  </div>
+   546→                </div>
+   547→
+   548→                <Separator />
+   549→
+   550→                {/* Completion slider */}
+   551→                <div className="space-y-3">
+   552→                  <div className="flex items-center justify-between">
+   553→                    <Label className="text-xs text-muted-foreground">Completion</Label>
+   554→                    <span className="text-sm font-medium">{editCompletion}%</span>
+   555→                  </div>
+   556→                  <Slider
+   557→                    value={[editCompletion]}
+   558→                    onValueChange={(v) => setEditCompletion(v[0])}
+   559→                    max={100}
+   560→                    step={5}
+   561→                  />
+   562→                  <Progress value={editCompletion} className="h-1.5" />
+   563→                </div>
+   564→
+   565→                <Separator />
+   566→
+   567→                {/* Status dropdown */}
+   568→                <div className="flex items-center justify-between">
+   569→                  <Label className="text-xs text-muted-foreground">Status</Label>
+   570→                  <Select value={editStatus} onValueChange={setEditStatus}>
+   571→                    <SelectTrigger className="w-[180px] h-9">
+   572→                      <SelectValue />
+   573→                    </SelectTrigger>
+   574→                    <SelectContent>
+   575→                      <SelectItem value="not_started">Not Started</SelectItem>
+   576→                      <SelectItem value="in_progress">In Progress</SelectItem>
+   577→                      <SelectItem value="blocked">Blocked</SelectItem>
+   578→                      <SelectItem value="submitted">Submitted</SelectItem>
+   579→                      <SelectItem value="under_review">Under Review</SelectItem>
+   580→                      <SelectItem value="verified_completed">Verified Completed</SelectItem>
+   581→                      <SelectItem value="overdue">Overdue</SelectItem>
+   582→                    </SelectContent>
+   583→                  </Select>
+   584→                </div>
+   585→
+   586→                {/* Save button */}
+   587→                <div className="flex items-center gap-3 pt-2">
+   588→                  <Button onClick={handleSave} disabled={saving} className="gap-2">
+   589→                    {saving ? (
+   590→                      <Loader2 className="h-4 w-4 animate-spin" />
+   591→                    ) : (
+   592→                      <Save className="h-4 w-4" />
+   593→                    )}
+   594→                    Save Changes
+   595→                  </Button>
+   596→                  {saveSuccess && (
+   597→                    <span className="text-xs text-emerald-600 flex items-center gap-1">
+   598→                      <CheckCircle className="h-3.5 w-3.5" />
+   599→                      Saved!
+   600→                    </span>
+   601→                  )}
+   602→                  {saveError && (
+   603→                    <span className="text-xs text-destructive">{saveError}</span>
+   604→                  )}
+   605→                </div>
+   606→              </CardContent>
+   607→            </Card>
+   608→
+   609→            {/* Dependencies */}
+   610→            <Card>
+   611→              <CardHeader>
+   612→                <CardTitle className="text-base">Dependencies</CardTitle>
+   613→              </CardHeader>
+   614→              <CardContent className="space-y-3">
+   615→                {/* This task depends on */}
+   616→                <div>
+   617→                  <button
+   618→                    className="flex items-center gap-2 text-sm font-medium w-full text-left"
+   619→                    onClick={() => setDepsExpanded(!depsExpanded)}
+   620→                  >
+   621→                    {depsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+   622→                    Depends On ({task.dependencies.length})
+   623→                  </button>
+   624→                  {depsExpanded && (
+   625→                    <div className="ml-6 mt-2 space-y-2">
+   626→                      {task.dependencies.length === 0 ? (
+   627→                        <p className="text-xs text-muted-foreground">No dependencies</p>
+   628→                      ) : (
+   629→                        task.dependencies.map((dep) => (
+   630→                          <div
+   631→                            key={dep.dependsOn.id}
+   632→                            className="flex items-center gap-2 text-sm p-2 rounded border cursor-pointer hover:bg-muted/50"
+   633→                            onClick={() => navigate('task-detail', { id: dep.dependsOn.id })}
+   634→                          >
+   635→                            <Badge variant="outline" className={`text-[10px] ${statusColors[dep.dependsOn.status] || ''}`}>
+   636→                              {dep.dependsOn.status.replace(/_/g, ' ')}
+   637→                            </Badge>
+   638→                            <span className="flex-1 truncate">{dep.dependsOn.title}</span>
+   639→                          </div>
+   640→                        ))
+   641→                      )}
+   642→                    </div>
+   643→                  )}
+   644→                </div>
+   645→
+   646→                <Separator />
+   647→
+   648→                {/* Tasks depending on this */}
+   649→                <div>
+   650→                  <button
+   651→                    className="flex items-center gap-2 text-sm font-medium w-full text-left"
+   652→                    onClick={() => setDepOfExpanded(!depOfExpanded)}
+   653→                  >
+   654→                    {depOfExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+   655→                    Required By ({task.dependentTasks.length})
+   656→                  </button>
+   657→                  {depOfExpanded && (
+   658→                    <div className="ml-6 mt-2 space-y-2">
+   659→                      {task.dependentTasks.length === 0 ? (
+   660→                        <p className="text-xs text-muted-foreground">No tasks depend on this</p>
+   661→                      ) : (
+   662→                        task.dependentTasks.map((dep) => (
+   663→                          <div
+   664→                            key={dep.task.id}
+   665→                            className="flex items-center gap-2 text-sm p-2 rounded border cursor-pointer hover:bg-muted/50"
+   666→                            onClick={() => navigate('task-detail', { id: dep.task.id })}
+   667→                          >
+   668→                            <Badge variant="outline" className={`text-[10px] ${statusColors[dep.task.status] || ''}`}>
+   669→                              {dep.task.status.replace(/_/g, ' ')}
+   670→                            </Badge>
+   671→                            <span className="flex-1 truncate">{dep.task.title}</span>
+   672→                          </div>
+   673→                        ))
+   674→                      )}
+   675→                    </div>
+   676→                  )}
+   677→                </div>
+   678→              </CardContent>
+   679→            </Card>
+   680→          </TabsContent>
+   681→
+   682→          {/* ==================== EVIDENCE TAB ==================== */}
+   683→          <TabsContent value="evidence" className="space-y-4">
+   684→            <div className="flex items-center justify-between">
+   685→              <h3 className="text-sm font-semibold">
+   686→                Evidence ({task.evidence.length})
+   687→              </h3>
+   688→              <div className="flex gap-2">
+   689→                <Button
+   690→                  size="sm"
+   691→                  variant="outline"
+   692→                  onClick={handleVerify}
+   693→                  disabled={verifying || task.evidence.length === 0}
+   694→                  className="gap-1.5"
+   695→                >
+   696→                  {verifying ? (
+   697→                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   698→                  ) : (
+   699→                    <Sparkles className="h-3.5 w-3.5" />
+   700→                  )}
+   701→                  Verify with AI
+   702→                </Button>
+   703→                <Button size="sm" onClick={() => setEvidenceOpen(true)} className="gap-1.5">
+   704→                  <Plus className="h-3.5 w-3.5" />
+   705→                  Add Evidence
+   706→                </Button>
+   707→              </div>
+   708→            </div>
+   709→
+   710→            {task.evidence.length === 0 ? (
+   711→              <Card>
+   712→                <CardContent className="p-8 text-center">
+   713→                  <ImageIcon className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+   714→                  <p className="text-sm text-muted-foreground">No evidence added yet.</p>
+   715→                  <p className="text-xs text-muted-foreground mt-1">Add screenshots, links, or code to prove task completion.</p>
+   716→                </CardContent>
+   717→              </Card>
+   718→            ) : (
+   719→              <div className="space-y-3">
+   720→                {task.evidence.map((ev) => {
+   721→                  const Icon = evidenceTypeIcons[ev.type] || FileText
+   722→                  return (
+   723→                    <Card key={ev.id}>
+   724→                      <CardContent className="p-4 flex items-start gap-3">
+   725→                        <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+   726→                          <Icon className="h-4 w-4 text-muted-foreground" />
+   727→                        </div>
+   728→                        <div className="flex-1 min-w-0">
+   729→                          <div className="flex items-center justify-between gap-2">
+   730→                            <h4 className="text-sm font-medium">{ev.title}</h4>
+   731→                            {ev.confidence !== null && ev.confidence !== undefined && (
+   732→                              <Badge
+   733→                                variant="outline"
+   734→                                className={`text-[10px] shrink-0 ${
+   735→                                  ev.confidence >= 70
+   736→                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+   737→                                    : ev.confidence >= 40
+   738→                                      ? 'bg-amber-100 text-amber-700 border-amber-200'
+   739→                                      : 'bg-red-100 text-red-700 border-red-200'
+   740→                                }`}
+   741→                              >
+   742→                                {Math.round(ev.confidence)}% confidence
+   743→                              </Badge>
+   744→                            )}
+   745→                          </div>
+   746→                          {ev.description && (
+   747→                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+   748→                              {ev.description}
+   749→                            </p>
+   750→                          )}
+   751→                          {ev.url && (
+   752→                            <a
+   753→                              href={ev.url}
+   754→                              target="_blank"
+   755→                              rel="noopener noreferrer"
+   756→                              className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
+   757→                            >
+   758→                              <Link2 className="h-3 w-3" />
+   759→                              {ev.url}
+   760→                            </a>
+   761→                          )}
+   762→                        </div>
+   763→                      </CardContent>
+   764→                    </Card>
+   765→                  )
+   766→                })}
+   767→              </div>
+   768→            )}
+   769→
+   770→            {/* Evidence Dialog */}
+   771→            <Dialog open={evidenceOpen} onOpenChange={setEvidenceOpen}>
+   772→              <DialogContent>
+   773→                <DialogHeader>
+   774→                  <DialogTitle>Add Evidence</DialogTitle>
+   775→                  <DialogDescription>Add proof of work for this task</DialogDescription>
+   776→                </DialogHeader>
+   777→                <div className="space-y-4">
+   778→                  <div className="space-y-2">
+   779→                    <Label>Type</Label>
+   780→                    <Select value={evidenceType} onValueChange={setEvidenceType}>
+   781→                      <SelectTrigger>
+   782→                        <SelectValue />
+   783→                      </SelectTrigger>
+   784→                      <SelectContent>
+   785→                        {evidenceTypes.map((t) => (
+   786→                          <SelectItem key={t.value} value={t.value}>
+   787→                            {t.label}
+   788→                          </SelectItem>
+   789→                        ))}
+   790→                      </SelectContent>
+   791→                    </Select>
+   792→                  </div>
+   793→                  <div className="space-y-2">
+   794→                    <Label>Title *</Label>
+   795→                    <Input
+   796→                      value={evidenceTitle}
+   797→                      onChange={(e) => setEvidenceTitle(e.target.value)}
+   798→                      placeholder="e.g., Login page implementation"
+   799→                    />
+   800→                  </div>
+   801→                  <div className="space-y-2">
+   802→                    <Label>Description</Label>
+   803→                    <Textarea
+   804→                      value={evidenceDesc}
+   805→                      onChange={(e) => setEvidenceDesc(e.target.value)}
+   806→                      placeholder="Brief description of the evidence"
+   807→                      rows={2}
+   808→                    />
+   809→                  </div>
+   810→                  <div className="space-y-2">
+   811→                    <Label>URL</Label>
+   812→                    <Input
+   813→                      value={evidenceUrl}
+   814→                      onChange={(e) => setEvidenceUrl(e.target.value)}
+   815→                      placeholder="https://..."
+   816→                    />
+   817→                  </div>
+   818→                </div>
+   819→                <DialogFooter>
+   820→                  <Button variant="outline" onClick={() => setEvidenceOpen(false)}>
+   821→                    Cancel
+   822→                  </Button>
+   823→                  <Button
+   824→                    onClick={handleAddEvidence}
+   825→                    disabled={evidenceSaving || !evidenceTitle.trim()}
+   826→                    className="gap-2"
+   827→                  >
+   828→                    {evidenceSaving ? (
+   829→                      <Loader2 className="h-4 w-4 animate-spin" />
+   830→                    ) : (
+   831→                      <Plus className="h-4 w-4" />
+   832→                    )}
+   833→                    Add Evidence
+   834→                  </Button>
+   835→                </DialogFooter>
+   836→              </DialogContent>
+   837→            </Dialog>
+   838→          </TabsContent>
+   839→
+   840→          {/* ==================== AI HELP TAB ==================== */}
+   841→          <TabsContent value="ai-help" className="space-y-4">
+   842→            <div className="flex items-center gap-2 mb-2">
+   843→              <Brain className="h-4 w-4 text-primary" />
+   844→              <h3 className="text-sm font-semibold">AI Code Helper</h3>
+   845→            </div>
+   846→
+   847→            {/* Messages */}
+   848→            <div className="space-y-3 max-h-[500px] overflow-y-auto">
+   849→              {aiMessages.length === 0 && (
+   850→                <div className="text-center py-12">
+   851→                  <Brain className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+   852→                  <p className="text-sm text-muted-foreground">Ask AI for help with this task.</p>
+   853→                  <p className="text-xs text-muted-foreground mt-1">
+   854→                    Get code suggestions, debugging help, or architecture advice.
+   855→                  </p>
+   856→                </div>
+   857→              )}
+   858→              {aiMessages.map((msg, i) => (
+   859→                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+   860→                  <div
+   861→                    className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
+   862→                      msg.role === 'user'
+   863→                        ? 'bg-primary text-primary-foreground'
+   864→                        : 'bg-muted'
+   865→                    }`}
+   866→                  >
+   867→                    <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{msg.content}</pre>
+   868→                  </div>
+   869→                </div>
+   870→              ))}
+   871→              {aiLoading && (
+   872→                <div className="flex justify-start">
+   873→                  <div className="bg-muted rounded-lg px-4 py-3 text-sm">
+   874→                    <div className="flex items-center gap-2">
+   875→                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   876→                      <span className="text-muted-foreground">AI is thinking...</span>
+   877→                    </div>
+   878→                  </div>
+   879→                </div>
+   880→              )}
+   881→            </div>
+   882→
+   883→            {/* Input */}
+   884→            <div className="flex gap-2 sticky bottom-0 bg-background pt-2">
+   885→              <Input
+   886→                placeholder="Ask about your task..."
+   887→                value={aiQuestion}
+   888→                onChange={(e) => setAiQuestion(e.target.value)}
+   889→                onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) handleAiChat() }}
+   890→                disabled={aiLoading}
+   891→                className="flex-1"
+   892→              />
+   893→              <Button onClick={handleAiChat} disabled={aiLoading || !aiQuestion.trim()} size="icon">
+   894→                <Send className="h-4 w-4" />
+   895→              </Button>
+   896→            </div>
+   897→          </TabsContent>
+   898→
+   899→          {/* ==================== COMMENTS TAB ==================== */}
+   900→          <TabsContent value="comments" className="space-y-4">
+   901→            <h3 className="text-sm font-semibold">
+   902→              Comments ({comments.length})
+   903→            </h3>
+   904→
+   905→            {/* Comment input */}
+   906→            <div className="flex gap-2">
+   907→              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0 mt-0.5">
+   908→                {userId.charAt(0).toUpperCase()}
+   909→              </div>
+   910→              <div className="flex-1 flex gap-2">
+   911→                <Input
+   912→                  placeholder="Add a comment..."
+   913→                  value={commentInput}
+   914→                  onChange={(e) => setCommentInput(e.target.value)}
+   915→                  onKeyDown={(e) => { if (e.key === 'Enter' && !submittingComment) handleAddComment() }}
+   916→                  disabled={submittingComment}
+   917→                />
+   918→                <Button
+   919→                  onClick={handleAddComment}
+   920→                  disabled={submittingComment || !commentInput.trim()}
+   921→                  size="icon"
+   922→                  className="shrink-0"
+   923→                >
+   924→                  {submittingComment ? (
+   925→                    <Loader2 className="h-4 w-4 animate-spin" />
+   926→                  ) : (
+   927→                    <Send className="h-4 w-4" />
+   928→                  )}
+   929→                </Button>
+   930→              </div>
+   931→            </div>
+   932→
+   933→            <Separator />
+   934→
+   935→            {/* Comments list */}
+   936→            <div className="space-y-4 max-h-[500px] overflow-y-auto">
+   937→              {comments.length === 0 ? (
+   938→                <div className="text-center py-8">
+   939→                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+   940→                  <p className="text-sm text-muted-foreground">No comments yet.</p>
+   941→                </div>
+   942→              ) : (
+   943→                comments.map((comment) => (
+   944→                  <div key={comment.id} className="flex gap-3">
+   945→                    <Avatar className="h-8 w-8 shrink-0">
+   946→                      <AvatarImage src={comment.user.avatar || ''} />
+   947→                      <AvatarFallback className="text-[10px]">
+   948→                        {comment.user.name?.charAt(0).toUpperCase() || comment.user.email.charAt(0).toUpperCase()}
+   949→                      </AvatarFallback>
+   950→                    </Avatar>
+   951→                    <div className="flex-1">
+   952→                      <div className="flex items-center gap-2">
+   953→                        <span className="text-sm font-medium">
+   954→                          {comment.user.name || comment.user.email}
+   955→                        </span>
+   956→                        <span className="text-xs text-muted-foreground">
+   957→                          {new Date(comment.createdAt).toLocaleDateString('en-US', {
+   958→                            month: 'short',
+   959→                            day: 'numeric',
+   960→                            hour: 'numeric',
+   961→                            minute: '2-digit',
+   962→                          })}
+   963→                        </span>
+   964→                      </div>
+   965→                      <p className="text-sm text-muted-foreground mt-0.5">{comment.content}</p>
+   966→                    </div>
+   967→                  </div>
+   968→                ))
+   969→              )}
+   970→            </div>
+   971→          </TabsContent>
+   972→        </Tabs>
+   973→      </div>
+   974→    </div>
+   975→  )
+   976→}
+   977→
