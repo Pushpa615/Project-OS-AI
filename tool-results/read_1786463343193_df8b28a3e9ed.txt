@@ -1,0 +1,658 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useCallback } from 'react'
+     4→import {
+     5→  BarChart3,
+     6→  TrendingUp,
+     7→  CheckCircle,
+     8→  Clock,
+     9→  AlertTriangle,
+    10→  ShieldAlert,
+    11→  Activity,
+    12→  Target,
+    13→  Users,
+    14→  ChevronDown,
+    15→  RefreshCw,
+    16→} from 'lucide-react'
+    17→import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Badge } from '@/components/ui/badge'
+    20→import { Progress } from '@/components/ui/progress'
+    21→import { Skeleton } from '@/components/ui/skeleton'
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→} from '@/components/ui/select'
+    29→import {
+    30→  BarChart,
+    31→  Bar,
+    32→  PieChart,
+    33→  Pie,
+    34→  Cell,
+    35→  LineChart,
+    36→  Line,
+    37→  XAxis,
+    38→  YAxis,
+    39→  CartesianGrid,
+    40→  Tooltip,
+    41→  ResponsiveContainer,
+    42→  Legend,
+    43→} from 'recharts'
+    44→import { useNavStore } from '@/lib/nav-store'
+    45→
+    46→// ==================== TYPES ====================
+    47→
+    48→interface Project {
+    49→  id: string
+    50→  name: string
+    51→  status: string
+    52→  deadline?: string | null
+    53→}
+    54→
+    55→interface AnalyticsData {
+    56→  taskStats: {
+    57→    total: number
+    58→    completed: number
+    59→    inProgress: number
+    60→    notStarted: number
+    61→    blocked: number
+    62→    overdue: number
+    63→  }
+    64→  milestoneProgress: { id: string; title: string; progress: number; status: string }[]
+    65→  teamContribution: { name: string; tasks: number; completed: number; inProgress: number }[]
+    66→  weeklyActivity: { week: string; completed: number }[]
+    67→  priorityDistribution: { priority: string; count: number }[]
+    68→  overdueCount: number
+    69→  onTimeRate: number
+    70→  overallProgress: number
+    71→}
+    72→
+    73→// ==================== COLORS ====================
+    74→
+    75→const STATUS_COLORS: Record<string, string> = {
+    76→  Not_Started: '#94a3b8',
+    77→  In_Progress: '#f59e0b',
+    78→  Blocked: '#ef4444',
+    79→  Completed: '#10b981',
+    80→  Overdue: '#f97316',
+    81→}
+    82→
+    83→const PIE_COLORS = ['#10b981', '#f59e0b', '#94a3b8', '#ef4444', '#f97316']
+    84→const BAR_COLORS = ['#10b981', '#f59e0b']
+    85→
+    86→// ==================== COMPONENT ====================
+    87→
+    88→export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId: string; projectId?: string }) {
+    89→  const navigate = useNavStore((s) => s.navigate)
+    90→
+    91→  const [projects, setProjects] = useState<Project[]>([])
+    92→  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || 'all')
+    93→  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+    94→  const [loading, setLoading] = useState(true)
+    95→  const [error, setError] = useState<string | null>(null)
+    96→
+    97→  const fetchProjects = useCallback(async () => {
+    98→    try {
+    99→      const res = await fetch(`/api/projects?userId=${userId}`)
+   100→      const json = await res.json()
+   101→      if (json.data) setProjects(json.data)
+   102→    } catch {
+   103→      // ignore
+   104→    }
+   105→  }, [userId])
+   106→
+   107→  const fetchAnalytics = useCallback(async () => {
+   108→    setLoading(true)
+   109→    setError(null)
+   110→    try {
+   111→      const url = selectedProjectId === 'all'
+   112→        ? `/api/analytics?userId=${userId}`
+   113→        : `/api/analytics?projectId=${selectedProjectId}`
+   114→      const res = await fetch(url)
+   115→      const json = await res.json()
+   116→      if (json.data) {
+   117→        setAnalytics(json.data)
+   118→      } else if (json.error) {
+   119→        setError(json.error)
+   120→      }
+   121→    } catch {
+   122→      setError('Failed to load analytics')
+   123→    } finally {
+   124→      setLoading(false)
+   125→    }
+   126→  }, [userId, selectedProjectId])
+   127→
+   128→  useEffect(() => {
+   129→    fetchProjects()
+   130→  }, [fetchProjects])
+   131→
+   132→  useEffect(() => {
+   133→    fetchAnalytics()
+   134→  }, [fetchAnalytics])
+   135→
+   136→  // Task status data for bar chart
+   137→  const taskStatusData = analytics
+   138→    ? [
+   139→        { name: 'Not Started', count: analytics.taskStats.notStarted },
+   140→        { name: 'In Progress', count: analytics.taskStats.inProgress },
+   141→        { name: 'Blocked', count: analytics.taskStats.blocked },
+   142→        { name: 'Completed', count: analytics.taskStats.completed },
+   143→        { name: 'Overdue', count: analytics.taskStats.overdue },
+   144→      ]
+   145→    : []
+   146→
+   147→  // Pie chart data
+   148→  const pieData = analytics
+   149→    ? [
+   150→        { name: 'Completed', value: analytics.taskStats.completed },
+   151→        { name: 'In Progress', value: analytics.taskStats.inProgress },
+   152→        { name: 'Not Started', value: analytics.taskStats.notStarted },
+   153→        { name: 'Blocked', value: analytics.taskStats.blocked },
+   154→        { name: 'Overdue', value: analytics.taskStats.overdue },
+   155→      ].filter((d) => d.value > 0)
+   156→    : []
+   157→
+   158→  // Risk level for deadline proximity
+   159→  function getDeadlineRisk(projectId: string): 'low' | 'medium' | 'high' | 'critical' {
+   160→    const project = projects.find((p) => p.id === projectId)
+   161→    if (!project) return 'low'
+   162→    if (!project.deadline) return 'low'
+   163→    const daysRemaining = (new Date(project.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+   164→    if (daysRemaining < 0) return 'critical'
+   165→    if (daysRemaining <= 3) return 'high'
+   166→    if (daysRemaining <= 7) return 'medium'
+   167→    return 'low'
+   168→  }
+   169→
+   170→  // ==================== LOADING STATE ====================
+   171→
+   172→  if (loading && !analytics) {
+   173→    return (
+   174→      <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   175→        <div className="flex items-center justify-between">
+   176→          <Skeleton className="h-8 w-48" />
+   177→          <Skeleton className="h-10 w-48" />
+   178→        </div>
+   179→        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   180→          {Array.from({ length: 4 }).map((_, i) => (
+   181→            <Skeleton key={i} className="h-28 rounded-xl" />
+   182→          ))}
+   183→        </div>
+   184→        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   185→          <Skeleton className="h-80 rounded-xl" />
+   186→          <Skeleton className="h-80 rounded-xl" />
+   187→        </div>
+   188→        <Skeleton className="h-64 rounded-xl" />
+   189→      </div>
+   190→    )
+   191→  }
+   192→
+   193→  // ==================== ERROR STATE ====================
+   194→
+   195→  if (error && !analytics) {
+   196→    return (
+   197→      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+   198→        <Card className="w-full max-w-md text-center p-6">
+   199→          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+   200→          <h2 className="text-lg font-semibold mb-2">Error Loading Analytics</h2>
+   201→          <p className="text-sm text-muted-foreground mb-4">{error}</p>
+   202→          <Button onClick={fetchAnalytics} variant="outline">
+   203→            <RefreshCw className="h-4 w-4 mr-2" /> Try Again
+   204→          </Button>
+   205→        </Card>
+   206→      </div>
+   207→    )
+   208→  }
+   209→
+   210→  const stats = analytics?.taskStats
+   211→  const milestoneProgress = analytics?.milestoneProgress || []
+   212→  const teamContribution = analytics?.teamContribution || []
+   213→  const weeklyActivity = analytics?.weeklyActivity || []
+   214→
+   215→  // ==================== RENDER ====================
+   216→
+   217→  return (
+   218→    <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+   219→      {/* Header */}
+   220→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   221→        <div>
+   222→          <h1 className="text-2xl font-bold flex items-center gap-2">
+   223→            <BarChart3 className="h-6 w-6 text-primary" />
+   224→            Analytics
+   225→          </h1>
+   226→          <p className="text-sm text-muted-foreground mt-1">
+   227→            Track project progress and team performance
+   228→          </p>
+   229→        </div>
+   230→        {projects.length > 0 && (
+   231→          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+   232→            <SelectTrigger className="w-full sm:w-64">
+   233→              <SelectValue placeholder="Select project" />
+   234→            </SelectTrigger>
+   235→            <SelectContent>
+   236→              <SelectItem value="all">All Projects</SelectItem>
+   237→              {projects.map((p) => (
+   238→                <SelectItem key={p.id} value={p.id}>
+   239→                  {p.name}
+   240→                </SelectItem>
+   241→              ))}
+   242→            </SelectContent>
+   243→          </Select>
+   244→        )}
+   245→      </div>
+   246→
+   247→      {/* Stats Cards */}
+   248→      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   249→        <Card className="p-4">
+   250→          <div className="flex items-center justify-between mb-2">
+   251→            <span className="text-xs text-muted-foreground font-medium">Overall Progress</span>
+   252→            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+   253→              <Target className="h-4 w-4 text-emerald-500" />
+   254→            </div>
+   255→          </div>
+   256→          <div className="text-2xl font-bold">{analytics?.overallProgress ?? 0}%</div>
+   257→          <Progress value={analytics?.overallProgress ?? 0} className="mt-2 h-1.5" />
+   258→        </Card>
+   259→
+   260→        <Card className="p-4">
+   261→          <div className="flex items-center justify-between mb-2">
+   262→            <span className="text-xs text-muted-foreground font-medium">Tasks Completed</span>
+   263→            <div className="h-8 w-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
+   264→              <CheckCircle className="h-4 w-4 text-teal-500" />
+   265→            </div>
+   266→          </div>
+   267→          <div className="text-2xl font-bold">{stats?.completed ?? 0}</div>
+   268→          <p className="text-xs text-muted-foreground mt-1">
+   269→            of {stats?.total ?? 0} total
+   270→          </p>
+   271→        </Card>
+   272→
+   273→        <Card className="p-4">
+   274→          <div className="flex items-center justify-between mb-2">
+   275→            <span className="text-xs text-muted-foreground font-medium">On-Time Rate</span>
+   276→            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   277→              <Clock className="h-4 w-4 text-amber-500" />
+   278→            </div>
+   279→          </div>
+   280→          <div className="text-2xl font-bold">{analytics?.onTimeRate ?? 0}%</div>
+   281→          <p className="text-xs text-muted-foreground mt-1">tasks delivered on time</p>
+   282→        </Card>
+   283→
+   284→        <Card className="p-4">
+   285→          <div className="flex items-center justify-between mb-2">
+   286→            <span className="text-xs text-muted-foreground font-medium">Overdue</span>
+   287→            <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+   288→              <ShieldAlert className="h-4 w-4 text-red-500" />
+   289→            </div>
+   290→          </div>
+   291→          <div className="text-2xl font-bold">{stats?.overdue ?? 0}</div>
+   292→          <p className="text-xs text-muted-foreground mt-1">tasks past deadline</p>
+   293→        </Card>
+   294→      </div>
+   295→
+   296→      {/* Charts Row 1 */}
+   297→      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   298→        {/* Tasks by Status Bar Chart */}
+   299→        <Card>
+   300→          <CardHeader className="pb-2">
+   301→            <CardTitle className="text-sm font-semibold">Tasks by Status</CardTitle>
+   302→            <CardDescription className="text-xs">Distribution of task statuses</CardDescription>
+   303→          </CardHeader>
+   304→          <CardContent>
+   305→            <div className="h-64">
+   306→              <ResponsiveContainer width="100%" height="100%">
+   307→                <BarChart data={taskStatusData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+   308→                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+   309→                  <XAxis dataKey="name" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+   310→                  <YAxis tick={{ fontSize: 11 }} />
+   311→                  <Tooltip
+   312→                    contentStyle={{
+   313→                      backgroundColor: 'hsl(var(--card))',
+   314→                      border: '1px solid hsl(var(--border))',
+   315→                      borderRadius: '8px',
+   316→                      fontSize: '12px',
+   317→                    }}
+   318→                  />
+   319→                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+   320→                    {taskStatusData.map((entry, index) => (
+   321→                      <Cell key={index} fill={STATUS_COLORS[entry.name.replace(/ /g, '_')] || '#94a3b8'} />
+   322→                    ))}
+   323→                  </Bar>
+   324→                </BarChart>
+   325→              </ResponsiveContainer>
+   326→            </div>
+   327→          </CardContent>
+   328→        </Card>
+   329→
+   330→        {/* Task Completion Pie Chart */}
+   331→        <Card>
+   332→          <CardHeader className="pb-2">
+   333→            <CardTitle className="text-sm font-semibold">Completion Distribution</CardTitle>
+   334→            <CardDescription className="text-xs">Task status breakdown</CardDescription>
+   335→          </CardHeader>
+   336→          <CardContent>
+   337→            <div className="h-64">
+   338→              {pieData.length > 0 ? (
+   339→                <ResponsiveContainer width="100%" height="100%">
+   340→                  <PieChart>
+   341→                    <Pie
+   342→                      data={pieData}
+   343→                      cx="50%"
+   344→                      cy="50%"
+   345→                      innerRadius={50}
+   346→                      outerRadius={90}
+   347→                      paddingAngle={3}
+   348→                      dataKey="value"
+   349→                    >
+   350→                      {pieData.map((_, index) => (
+   351→                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+   352→                      ))}
+   353→                    </Pie>
+   354→                    <Tooltip
+   355→                      contentStyle={{
+   356→                        backgroundColor: 'hsl(var(--card))',
+   357→                        border: '1px solid hsl(var(--border))',
+   358→                        borderRadius: '8px',
+   359→                        fontSize: '12px',
+   360→                      }}
+   361→                    />
+   362→                    <Legend
+   363→                      verticalAlign="bottom"
+   364→                      iconType="circle"
+   365→                      iconSize={8}
+   366→                      wrapperStyle={{ fontSize: '11px' }}
+   367→                    />
+   368→                  </PieChart>
+   369→                </ResponsiveContainer>
+   370→              ) : (
+   371→                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+   372→                  No task data available
+   373→                </div>
+   374→              )}
+   375→            </div>
+   376→          </CardContent>
+   377→        </Card>
+   378→      </div>
+   379→
+   380→      {/* Charts Row 2 */}
+   381→      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   382→        {/* Activity Trend Line Chart */}
+   383→        <Card>
+   384→          <CardHeader className="pb-2">
+   385→            <CardTitle className="text-sm font-semibold">Activity Trend</CardTitle>
+   386→            <CardDescription className="text-xs">Tasks completed per week</CardDescription>
+   387→          </CardHeader>
+   388→          <CardContent>
+   389→            <div className="h-64">
+   390→              {weeklyActivity.length > 0 ? (
+   391→                <ResponsiveContainer width="100%" height="100%">
+   392→                  <LineChart data={weeklyActivity} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+   393→                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+   394→                    <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+   395→                    <YAxis tick={{ fontSize: 11 }} />
+   396→                    <Tooltip
+   397→                      contentStyle={{
+   398→                        backgroundColor: 'hsl(var(--card))',
+   399→                        border: '1px solid hsl(var(--border))',
+   400→                        borderRadius: '8px',
+   401→                        fontSize: '12px',
+   402→                      }}
+   403→                    />
+   404→                    <Line
+   405→                      type="monotone"
+   406→                      dataKey="completed"
+   407→                      stroke="#10b981"
+   408→                      strokeWidth={2}
+   409→                      dot={{ r: 4, fill: '#10b981' }}
+   410→                      activeDot={{ r: 6 }}
+   411→                    />
+   412→                  </LineChart>
+   413→                </ResponsiveContainer>
+   414→              ) : (
+   415→                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+   416→                  No weekly activity data yet
+   417→                </div>
+   418→              )}
+   419→            </div>
+   420→          </CardContent>
+   421→        </Card>
+   422→
+   423→        {/* Team Member Contribution Bar Chart */}
+   424→        <Card>
+   425→          <CardHeader className="pb-2">
+   426→            <CardTitle className="text-sm font-semibold">Team Contribution</CardTitle>
+   427→            <CardDescription className="text-xs">Tasks per team member</CardDescription>
+   428→          </CardHeader>
+   429→          <CardContent>
+   430→            <div className="h-64">
+   431→              {teamContribution.length > 0 ? (
+   432→                <ResponsiveContainer width="100%" height="100%">
+   433→                  <BarChart data={teamContribution} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+   434→                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+   435→                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+   436→                    <YAxis tick={{ fontSize: 11 }} />
+   437→                    <Tooltip
+   438→                      contentStyle={{
+   439→                        backgroundColor: 'hsl(var(--card))',
+   440→                        border: '1px solid hsl(var(--border))',
+   441→                        borderRadius: '8px',
+   442→                        fontSize: '12px',
+   443→                      }}
+   444→                    />
+   445→                    <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
+   446→                    <Bar dataKey="completed" name="Completed" fill="#10b981" radius={[4, 4, 0, 0]} />
+   447→                    <Bar dataKey="inProgress" name="In Progress" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+   448→                  </BarChart>
+   449→                </ResponsiveContainer>
+   450→              ) : (
+   451→                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+   452→                  No team data available
+   453→                </div>
+   454→              )}
+   455→            </div>
+   456→          </CardContent>
+   457→        </Card>
+   458→      </div>
+   459→
+   460→      {/* Milestone Progress & Project Health */}
+   461→      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   462→        {/* Milestones */}
+   463→        <Card>
+   464→          <CardHeader className="pb-2">
+   465→            <CardTitle className="text-sm font-semibold">Milestone Progress</CardTitle>
+   466→            <CardDescription className="text-xs">Track milestone completion</CardDescription>
+   467→          </CardHeader>
+   468→          <CardContent>
+   469→            {milestoneProgress.length > 0 ? (
+   470→              <div className="space-y-3 max-h-72 overflow-y-auto">
+   471→                {milestoneProgress.map((ms) => (
+   472→                  <div key={ms.id} className="space-y-1.5">
+   473→                    <div className="flex items-center justify-between text-sm">
+   474→                      <span className="font-medium truncate mr-2">{ms.title}</span>
+   475→                      <Badge
+   476→                        variant={ms.status === 'completed' ? 'default' : 'secondary'}
+   477→                        className={
+   478→                          ms.status === 'completed'
+   479→                            ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shrink-0'
+   480→                            : ms.status === 'in_progress'
+   481→                              ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 shrink-0'
+   482→                              : 'shrink-0'
+   483→                        }
+   484→                      >
+   485→                        {ms.status.replace(/_/g, ' ')}
+   486→                      </Badge>
+   487→                    </div>
+   488→                    <Progress value={ms.progress} className="h-1.5" />
+   489→                  </div>
+   490→                ))}
+   491→              </div>
+   492→            ) : (
+   493→              <div className="text-center py-8 text-sm text-muted-foreground">
+   494→                <Target className="h-8 w-8 mx-auto mb-2 opacity-40" />
+   495→                No milestones yet
+   496→              </div>
+   497→            )}
+   498→          </CardContent>
+   499→        </Card>
+   500→
+   501→        {/* Project Health */}
+   502→        <Card>
+   503→          <CardHeader className="pb-2">
+   504→            <CardTitle className="text-sm font-semibold">Project Health</CardTitle>
+   505→            <CardDescription className="text-xs">Key health indicators</CardDescription>
+   506→          </CardHeader>
+   507→          <CardContent>
+   508→            <div className="space-y-4">
+   509→              {/* Schedule Risk */}
+   510→              <div className="flex items-center justify-between">
+   511→                <div className="flex items-center gap-2">
+   512→                  <Clock className="h-4 w-4 text-muted-foreground" />
+   513→                  <span className="text-sm">Schedule Risk</span>
+   514→                </div>
+   515→                <Badge
+   516→                  className={
+   517→                    (stats?.overdue ?? 0) > 3
+   518→                      ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+   519→                      : (stats?.overdue ?? 0) > 0
+   520→                        ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+   521→                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+   522→                  }
+   523→                >
+   524→                  {(stats?.overdue ?? 0) > 3 ? 'High' : (stats?.overdue ?? 0) > 0 ? 'Medium' : 'Low'}
+   525→                </Badge>
+   526→              </div>
+   527→
+   528→              <div className="h-px bg-border" />
+   529→
+   530→              {/* Team Workload */}
+   531→              <div className="flex items-center justify-between">
+   532→                <div className="flex items-center gap-2">
+   533→                  <Users className="h-4 w-4 text-muted-foreground" />
+   534→                  <span className="text-sm">Team Workload</span>
+   535→                </div>
+   536→                <Badge
+   537→                  className={
+   538→                    teamContribution.length === 0
+   539→                      ? 'bg-slate-500/10 text-slate-600 hover:bg-slate-500/20'
+   540→                      : (stats?.inProgress ?? 0) > (teamContribution.length * 3)
+   541→                        ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+   542→                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+   543→                  }
+   544→                >
+   545→                  {teamContribution.length === 0
+   546→                    ? 'N/A'
+   547→                    : (stats?.inProgress ?? 0) > teamContribution.length * 3
+   548→                      ? 'Overloaded'
+   549→                      : 'Balanced'}
+   550→                </Badge>
+   551→              </div>
+   552→
+   553→              <div className="h-px bg-border" />
+   554→
+   555→              {/* Deadline Proximity */}
+   556→              <div className="flex items-center justify-between">
+   557→                <div className="flex items-center gap-2">
+   558→                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+   559→                  <span className="text-sm">Deadline Proximity</span>
+   560→                </div>
+   561→                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+   562→                  On Track
+   563→                </Badge>
+   564→              </div>
+   565→
+   566→              <div className="h-px bg-border" />
+   567→
+   568→              {/* Blocked Tasks */}
+   569→              <div className="flex items-center justify-between">
+   570→                <div className="flex items-center gap-2">
+   571→                  <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+   572→                  <span className="text-sm">Blocked Tasks</span>
+   573→                </div>
+   574→                <Badge
+   575→                  className={
+   576→                    (stats?.blocked ?? 0) > 2
+   577→                      ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+   578→                      : (stats?.blocked ?? 0) > 0
+   579→                        ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+   580→                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+   581→                  }
+   582→                >
+   583→                  {stats?.blocked ?? 0} blocked
+   584→                </Badge>
+   585→              </div>
+   586→            </div>
+   587→          </CardContent>
+   588→        </Card>
+   589→      </div>
+   590→
+   591→      {/* Deadline Risk Section */}
+   592→      <Card>
+   593→        <CardHeader className="pb-2">
+   594→          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   595→            <AlertTriangle className="h-4 w-4 text-amber-500" />
+   596→            Deadline Risk
+   597→          </CardTitle>
+   598→          <CardDescription className="text-xs">Upcoming deadlines with risk assessment</CardDescription>
+   599→        </CardHeader>
+   600→        <CardContent>
+   601→          {milestoneProgress.filter((m) => m.status !== 'completed').length > 0 ? (
+   602→            <div className="space-y-3">
+   603→              {milestoneProgress
+   604→                .filter((m) => m.status !== 'completed')
+   605→                .map((ms) => {
+   606→                  const risk =
+   607→                    ms.progress < 30 ? 'critical' : ms.progress < 60 ? 'high' : ms.progress < 80 ? 'medium' : 'low'
+   608→                  return (
+   609→                    <div
+   610→                      key={ms.id}
+   611→                      className="flex items-center justify-between p-3 rounded-lg border"
+   612→                    >
+   613→                      <div className="flex items-center gap-3 min-w-0">
+   614→                        <div
+   615→                          className={`h-2 w-2 rounded-full shrink-0 ${
+   616→                            risk === 'critical'
+   617→                              ? 'bg-red-500'
+   618→                              : risk === 'high'
+   619→                                ? 'bg-amber-500'
+   620→                                : risk === 'medium'
+   621→                                  ? 'bg-yellow-500'
+   622→                                  : 'bg-emerald-500'
+   623→                          }`}
+   624→                        />
+   625→                        <span className="text-sm font-medium truncate">{ms.title}</span>
+   626→                      </div>
+   627→                      <div className="flex items-center gap-3">
+   628→                        <Progress value={ms.progress} className="w-24 h-1.5" />
+   629→                        <Badge
+   630→                          className={
+   631→                            risk === 'critical'
+   632→                              ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+   633→                              : risk === 'high'
+   634→                                ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+   635→                                : risk === 'medium'
+   636→                                  ? 'bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20'
+   637→                                  : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+   638→                          }
+   639→                        >
+   640→                          {risk.charAt(0).toUpperCase() + risk.slice(1)}
+   641→                        </Badge>
+   642→                      </div>
+   643→                    </div>
+   644→                  )
+   645→                })}
+   646→            </div>
+   647→          ) : (
+   648→            <div className="text-center py-8 text-sm text-muted-foreground">
+   649→              <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
+   650→              All milestones completed! No deadline risks.
+   651→            </div>
+   652→          )}
+   653→        </CardContent>
+   654→      </Card>
+   655→    </div>
+   656→  )
+   657→}
+   658→

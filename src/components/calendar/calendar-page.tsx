@@ -146,11 +146,12 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
   }, [userId, projectId])
 
   const fetchEvents = useCallback(async () => {
-    if (!projectId) return
+    const pid = projectId || eventProjectId
+    if (!pid) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/calendar?projectId=${projectId}`)
+      const res = await fetch(`/api/calendar?projectId=${pid}`)
       const json = await res.json()
       if (json.error) {
         setError(json.error)
@@ -162,7 +163,7 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, eventProjectId])
 
   useEffect(() => {
     fetchEvents()

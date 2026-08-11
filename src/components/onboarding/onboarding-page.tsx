@@ -452,7 +452,7 @@ function AccountsStep({
     try {
       // Connect any accounts with URLs that aren't yet connected
       const pendingProviders = Object.entries(accountUrls)
-        .filter(([url]) => url.trim() && !connectedAccounts.includes(url))
+        .filter(([provider, url]) => url.trim() && !connectedAccounts.includes(provider))
         .map(([provider]) => provider)
 
       for (const provider of pendingProviders) {
@@ -586,7 +586,7 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
     setSaving(true)
     try {
       // Save onboarding data
-      await fetch('/api/onboarding', {
+      const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -600,11 +600,15 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
           skills,
         }),
       })
-    } catch {
-      // Continue regardless
+      if (!res.ok) {
+        console.error('Failed to save onboarding data')
+        return
+      }
+      onComplete()
+    } catch (error) {
+      console.error('Onboarding save error:', error)
     } finally {
       setSaving(false)
-      onComplete()
     }
   }
 

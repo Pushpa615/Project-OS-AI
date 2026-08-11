@@ -5,6 +5,9 @@ import { requireAuth } from '@/lib/auth-helpers'
 // ========== GET: Get overdue tasks ==========
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireAuth(req)
+    if (auth.error) return auth.error
+
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
 

@@ -1,0 +1,1217 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useEffect } from 'react'
+     4→     4→import {
+     5→     5→  ArrowLeft,
+     6→     6→  Pencil,
+     7→     7→  Loader2,
+     8→     8→  Brain,
+     9→     9→  FileText,
+    10→    10→  ChevronDown,
+    11→    11→  ChevronRight,
+    12→    12→  CheckCircle,
+    13→    13→  Clock,
+    14→    14→  AlertTriangle,
+    15→    15→  Users,
+    16→    16→  FolderOpen,
+    17→    17→  BarChart3,
+    18→    18→  Calendar,
+    19→    19→  Sparkles,
+    20→    20→  Play,
+    21→    21→  Send,
+    22→    22→  ExternalLink,
+    23→    23→  UserPlus,
+    24→    24→  X,
+    25→    25→  Upload,
+    26→    26→  Trash2,
+    27→    27→} from 'lucide-react'
+    28→    28→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    29→    29→import { Button } from '@/components/ui/button'
+    30→    30→import { Badge } from '@/components/ui/badge'
+    31→    31→import { Input } from '@/components/ui/input'
+    32→    32→import { Progress } from '@/components/ui/progress'
+    33→    33→import { Skeleton } from '@/components/ui/skeleton'
+    34→    34→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    35→    35→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    36→    36→import { Separator } from '@/components/ui/separator'
+    37→    37→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+    38→    38→import { Textarea } from '@/components/ui/textarea'
+    39→    39→import { Label } from '@/components/ui/label'
+    40→    40→import { useNavStore } from '@/lib/nav-store'
+    41→    41→import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+    42→    42→
+    43→    43→// ==================== TYPES ====================
+    44→    44→
+    45→    45→interface ProjectMember {
+    46→    46→  userId: string
+    47→    47→  role: string
+    48→    48→  joinedAt: string
+    49→    49→  user: { id: string; name: string | null; email: string; avatar: string | null }
+    50→    50→}
+    51→    51→
+    52→    52→interface Milestone {
+    53→    53→  id: string
+    54→    54→  title: string
+    55→    55→  description: string | null
+    56→    56→  status: string
+    57→    57→  progress: number
+    58→    58→  order: number
+    59→    59→  _count: { tasks: number }
+    60→    60→}
+    61→    61→
+    62→    62→interface ProjectTask {
+    63→    63→  id: string
+    64→    64→  status: string
+    65→    65→  priority: string
+    66→    66→}
+    67→    67→
+    68→    68→interface TaskStats {
+    69→    69→  total: number
+    70→    70→  notStarted: number
+    71→    71→  inProgress: number
+    72→    72→  submitted: number
+    73→    73→  underReview: number
+    74→    74→  verifiedCompleted: number
+    75→    75→  overdue: number
+    76→    76→}
+    77→    77→
+    78→    78→interface AnalyticsTeamStat {
+    79→    79→  userId: string
+    80→    80→  name: string
+    81→    81→  role: string
+    82→    82→  avatar: string | null
+    83→    83→  totalTasks: number
+    84→    84→  completedTasks: number
+    85→    85→  inProgressTasks: number
+    86→    86→  overdueTasks: number
+    87→    87→  contributionScore: number
+    88→    88→}
+    89→    89→
+    90→    90→interface Report {
+    91→    91→  id: string
+    92→    92→  summary: string
+    93→    93→  strengths: string
+    94→    94→  weaknesses: string
+    95→    95→  challenges: string
+    96→    96→  improvements: string
+    97→    97→  recommendedSkills: string
+    98→    98→  futureImprovements: string
+    99→    99→  overallAssessment: string
+   100→   100→  generatedAt: string
+   101→   101→}
+   102→   102→
+   103→   103→interface Project {
+   104→   104→  id: string
+   105→   105→  name: string
+   106→   106→  description: string
+   107→   107→  status: string
+   108→   108→  progress: number
+   109→   109→  deadline: string | null
+   110→   110→  projectType: string
+   111→   111→  difficulty: string
+   112→   112→  techStack: string
+   113→   113→  features: string
+   114→   114→  requirements: string
+   115→   115→  targetUsers: string
+   116→   116→  goal: string
+   117→   117→  createdAt: string
+   118→   118→  completedAt: string | null
+   119→   119→  members: ProjectMember[]
+   120→   120→  milestones: Milestone[]
+   121→   121→  tasks: ProjectTask[]
+   122→   122→  taskStats: TaskStats
+   123→   123→  _count: { tasks: number; comments: number; files: number; reports: number }
+   124→   124→}
+   125→   125→
+   126→   126→// ==================== HELPERS ====================
+   127→   127→
+   128→   128→const statusColors: Record<string, string> = {
+   129→   129→  active: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+   130→   130→  completed: 'bg-teal-100 text-teal-700 border-teal-200',
+   131→   131→  on_hold: 'bg-amber-100 text-amber-700 border-amber-200',
+   132→   132→  planning: 'bg-slate-100 text-slate-700 border-slate-200',
+   133→   133→  archived: 'bg-gray-100 text-gray-600 border-gray-200',
+   134→   134→}
+   135→   135→
+   136→   136→const PIE_COLORS = ['#94a3b8', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6', '#ef4444', '#06b6d4']
+   137→   137→
+   138→   138→const PIE_DATA_LABELS: Record<string, string> = {
+   139→   139→  notStarted: 'Not Started',
+   140→   140→  inProgress: 'In Progress',
+   141→   141→  submitted: 'Submitted',
+   142→   142→  underReview: 'Under Review',
+   143→   143→  verifiedCompleted: 'Completed',
+   144→   144→  overdue: 'Overdue',
+   145→   145→}
+   146→   146→
+   147→   147→function parseJSONField(val: string | null | undefined): string[] {
+   148→   148→  if (!val) return []
+   149→   149→  try {
+   150→   150→    const parsed = JSON.parse(val)
+   151→   151→    return Array.isArray(parsed) ? parsed : []
+   152→   152→  } catch {
+   153→   153→    return []
+   154→   154→  }
+   155→   155→}
+   156→   156→
+   157→   157→function parseJSONObj(val: string | null | undefined): Record<string, unknown> {
+   158→   158→  if (!val) return {}
+   159→   159→  try {
+   160→   160→    return JSON.parse(val)
+   161→   161→  } catch {
+   162→   162→    return {}
+   163→   163→  }
+   164→   164→}
+   165→   165→
+   166→   166→// ==================== MAIN COMPONENT ====================
+   167→   167→
+   168→   168→export function ProjectDetailPage({ projectId, userId }: { projectId: string; userId: string }) {
+   169→   169→  const navigate = useNavStore((s) => s.navigate)
+   170→   170→  const [project, setProject] = useState<Project | null>(null)
+   171→   171→  const [loading, setLoading] = useState(true)
+   172→   172→  const [error, setError] = useState<string | null>(null)
+   173→   173→  const [tasks, setTasks] = useState<any[]>([])
+   174→   174→  const [analytics, setAnalytics] = useState<any>(null)
+   175→   175→  const [reports, setReports] = useState<Report[]>([])
+   176→   176→  const [generatingPlan, setGeneratingPlan] = useState(false)
+   177→   177→  const [generatingReport, setGeneratingReport] = useState(false)
+   178→   178→  const [activeTab, setActiveTab] = useState('overview')
+   179→   179→  const [memberEmail, setMemberEmail] = useState('')
+   180→   180→  const [memberError, setMemberError] = useState<string | null>(null)
+   181→   181→  const [editDialogOpen, setEditDialogOpen] = useState(false)
+   182→   182→  const [editName, setEditName] = useState('')
+   183→   183→  const [editDescription, setEditDescription] = useState('')
+   184→   184→  const [savingEdit, setSavingEdit] = useState(false)
+   185→   185→  const [files, setFiles] = useState<any[]>([])
+   186→   186→  const [uploadingFile, setUploadingFile] = useState(false)
+   187→   187→  const [milestoneTasks, setMilestoneTasks] = useState<Record<string, any[]>>({})
+   188→   188→
+   189→   189→  // Fetch project data
+   190→   190→  useEffect(() => {
+   191→   191→    async function fetchProject() {
+   192→   192→      try {
+   193→   193→        setLoading(true)
+   194→   194→        const res = await fetch(`/api/projects/${projectId}`)
+   195→   195→        const json = await res.json()
+   196→   196→        if (!res.ok) throw new Error(json.error || 'Failed to fetch project')
+   197→   197→        setProject(json.data)
+   198→   198→      } catch (err) {
+   199→   199→        setError(err instanceof Error ? err.message : 'Something went wrong')
+   200→   200→      } finally {
+   201→   201→        setLoading(false)
+   202→   202→      }
+   203→   203→    }
+   204→   204→    fetchProject()
+   205→   205→  }, [projectId])
+   206→   206→
+   207→   207→  // Fetch tasks when on tasks/team tab
+   208→   208→  useEffect(() => {
+   209→   209→    if (activeTab === 'tasks' || activeTab === 'team') {
+   210→   210→      fetchTasks()
+   211→   211→      fetchAnalytics()
+   212→   212→    }
+   213→   213→  }, [activeTab, projectId])
+   214→   214→
+   215→   215→  // Fetch reports
+   216→   216→  useEffect(() => {
+   217→   217→    if (activeTab === 'reports') {
+   218→   218→      fetchReports()
+   219→   219→    }
+   220→   220→  }, [activeTab, projectId])
+   221→   221→
+   222→   222→  async function fetchTasks() {
+   223→   223→    try {
+   224→   224→      const res = await fetch(`/api/tasks?projectId=${projectId}`)
+   225→   225→      const json = await res.json()
+   226→   226→      if (res.ok) setTasks(json.data || [])
+   227→   227→    } catch { /* ignore */ }
+   228→   228→  }
+   229→   229→
+   230→   230→  async function fetchAnalytics() {
+   231→   231→    try {
+   232→   232→      const res = await fetch(`/api/analytics?projectId=${projectId}`)
+   233→   233→      const json = await res.json()
+   234→   234→      if (res.ok) setAnalytics(json.data)
+   235→   235→    } catch { /* ignore */ }
+   236→   236→  }
+   237→   237→
+   238→   238→  async function fetchReports() {
+   239→   239→    try {
+   240→   240→      const res = await fetch(`/api/reports?projectId=${projectId}`)
+   241→   241→      const json = await res.json()
+   242→   242→      if (res.ok) setReports(json.data || [])
+   243→   243→    } catch { /* ignore */ }
+   244→   244→  }
+   245→   245→
+   246→   246→  async function handleGeneratePlan() {
+   247→   247→    try {
+   248→   248→      setGeneratingPlan(true)
+   249→   249→      const res = await fetch(`/api/projects/${projectId}/generate-plan`, {
+   250→   250→        method: 'POST',
+   251→   251→        headers: { 'Content-Type': 'application/json' },
+   252→   252→        body: JSON.stringify({ userId }),
+   253→   253→      })
+   254→   254→      const json = await res.json()
+   255→   255→      if (!res.ok) throw new Error(json.error || 'Failed to generate plan')
+   256→   256→      // Re-fetch project
+   257→   257→      const projRes = await fetch(`/api/projects/${projectId}`)
+   258→   258→      const projJson = await projRes.json()
+   259→   259→      if (projRes.ok) setProject(projJson.data)
+   260→   260→    } catch (err) {
+   261→   261→      setError(err instanceof Error ? err.message : 'Failed to generate plan')
+   262→   262→    } finally {
+   263→   263→      setGeneratingPlan(false)
+   264→   264→    }
+   265→   265→  }
+   266→   266→
+   267→   267→  async function handleGenerateReport() {
+   268→   268→    try {
+   269→   269→      setGeneratingReport(true)
+   270→   270→      const res = await fetch('/api/reports', {
+   271→   271→        method: 'POST',
+   272→   272→        headers: { 'Content-Type': 'application/json' },
+   273→   273→        body: JSON.stringify({ projectId, userId }),
+   274→   274→      })
+   275→   275→      const json = await res.json()
+   276→   276→      if (!res.ok) throw new Error(json.error || 'Failed to generate report')
+   277→   277→      await fetchReports()
+   278→   278→      // Also update project status
+   279→   279→      const projRes = await fetch(`/api/projects/${projectId}`)
+   280→   280→      const projJson = await projRes.json()
+   281→   281→      if (projRes.ok) setProject(projJson.data)
+   282→   282→    } catch (err) {
+   283→   283→      setError(err instanceof Error ? err.message : 'Failed to generate report')
+   284→   284→    } finally {
+   285→   285→      setGeneratingReport(false)
+   286→   286→    }
+   287→   287→  }
+   288→   288→
+   289→   289→  async function handleSaveEdit() {
+   290→   290→    try {
+   291→   291→      setSavingEdit(true)
+   292→   292→      setError(null)
+   293→   293→      const res = await fetch(`/api/projects/${projectId}`, {
+   294→   294→        method: 'PUT',
+   295→   295→        headers: { 'Content-Type': 'application/json' },
+   296→   296→        body: JSON.stringify({ userId, name: editName, description: editDescription }),
+   297→   297→      })
+   298→   298→      const json = await res.json()
+   299→   299→      if (!res.ok) throw new Error(json.error || 'Failed to update project')
+   300→   300→      setProject(json.data)
+   301→   301→      setEditDialogOpen(false)
+   302→   302→    } catch (err) {
+   303→   303→      setError(err instanceof Error ? err.message : 'Failed to update project')
+   304→   304→    } finally {
+   305→   305→      setSavingEdit(false)
+   306→   306→    }
+   307→   307→  }
+   308→   308→
+   309→   309→  function openEditDialog() {
+   310→   310→    if (!project) return
+   311→   311→    setEditName(project.name)
+   312→   312→    setEditDescription(project.description)
+   313→   313→    setEditDialogOpen(true)
+   314→   314→  }
+   315→   315→
+   316→   316→  // Fetch files when on files tab
+   317→   317→  useEffect(() => {
+   318→   318→    if (activeTab === 'files') {
+   319→   319→      fetchFiles()
+   320→   320→    }
+   321→   321→  }, [activeTab, projectId])
+   322→   322→
+   323→   323→  async function fetchFiles() {
+   324→   324→    try {
+   325→   325→      const res = await fetch(`/api/files?projectId=${projectId}`)
+   326→   326→      const json = await res.json()
+   327→   327→      if (res.ok) setFiles(json.data || [])
+   328→   328→    } catch { /* ignore */ }
+   329→   329→  }
+   330→   330→
+   331→   331→  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+   332→   332→    const file = e.target.files?.[0]
+   333→   333→    if (!file) return
+   334→   334→    try {
+   335→   335→      setUploadingFile(true)
+   336→   336→      const res = await fetch('/api/files', {
+   337→   337→        method: 'POST',
+   338→   338→        headers: { 'Content-Type': 'application/json' },
+   339→   339→        body: JSON.stringify({
+   340→   340→          projectId,
+   341→   341→          userId,
+   342→   342→          fileName: file.name,
+   343→   343→          fileSize: file.size,
+   344→   344→          mimeType: file.type,
+   345→   345→        }),
+   346→   346→      })
+   347→   347→      if (!res.ok) throw new Error('Failed to upload file')
+   348→   348→      await fetchFiles()
+   349→   349→      const projRes = await fetch(`/api/projects/${projectId}`)
+   350→   350→      const projJson = await projRes.json()
+   351→   351→      if (projRes.ok) setProject(projJson.data)
+   352→   352→    } catch { /* ignore */ } finally {
+   353→   353→      setUploadingFile(false)
+   354→   354→      e.target.value = ''
+   355→   355→    }
+   356→   356→  }
+   357→   357→
+   358→   358→  async function handleFileDelete(fileId: string) {
+   359→   359→    try {
+   360→   360→      const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' })
+   361→   361→      if (!res.ok) throw new Error('Failed to delete file')
+   362→   362→      await fetchFiles()
+   363→   363→      const projRes = await fetch(`/api/projects/${projectId}`)
+   364→   364→      const projJson = await projRes.json()
+   365→   365→      if (projRes.ok) setProject(projJson.data)
+   366→   366→    } catch { /* ignore */ }
+   367→   367→  }
+   368→   368→
+   369→   369→  async function fetchMilestoneTasks(msId: string) {
+   370→   370→    if (milestoneTasks[msId]) return
+   371→   371→    try {
+   372→   372→      const res = await fetch(`/api/tasks?milestoneId=${msId}`)
+   373→   373→      const json = await res.json()
+   374→   374→      if (res.ok) {
+   375→   375→        setMilestoneTasks((prev) => ({ ...prev, [msId]: json.data || [] }))
+   376→   376→      }
+   377→   377→    } catch { /* ignore */ }
+   378→   378→  }
+   379→   379→
+   380→   380→  async function handleAddMember() {
+   381→   381→    if (!memberEmail.trim()) return
+   382→   382→    try {
+   383→   383→      setMemberError(null)
+   384→   384→      const res = await fetch(`/api/projects/${projectId}/members`, {
+   385→   385→        method: 'POST',
+   386→   386→        headers: { 'Content-Type': 'application/json' },
+   387→   387→        body: JSON.stringify({ userId: memberEmail.trim(), role: 'member' }),
+   388→   388→      })
+   389→   389→      const json = await res.json()
+   390→   390→      if (!res.ok) throw new Error(json.error || 'Failed to add member')
+   391→   391→      setMemberEmail('')
+   392→   392→      // Re-fetch project for member list
+   393→   393→      const projRes = await fetch(`/api/projects/${projectId}`)
+   394→   394→      const projJson = await projRes.json()
+   395→   395→      if (projRes.ok) setProject(projJson.data)
+   396→   396→    } catch (err) {
+   397→   397→      setMemberError(err instanceof Error ? err.message : 'Failed to add member')
+   398→   398→    }
+   399→   399→  }
+   400→   400→
+   401→   401→  // ==================== LOADING STATE ====================
+   402→   402→  if (loading) {
+   403→   403→    return (
+   404→   404→      <div className="min-h-screen bg-background">
+   405→   405→        <div className="border-b bg-background">
+   406→   406→          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+   407→   407→            <Skeleton className="h-8 w-8 rounded-md" />
+   408→   408→            <Skeleton className="h-6 w-48" />
+   409→   409→          </div>
+   410→   410→        </div>
+   411→   411→        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+   412→   412→          <div className="flex gap-4">
+   413→   413→            <Skeleton className="h-20 w-20 rounded-xl" />
+   414→   414→            <div className="space-y-2 flex-1">
+   415→   415→              <Skeleton className="h-8 w-64" />
+   416→   416→              <Skeleton className="h-4 w-96" />
+   417→   417→              <Skeleton className="h-4 w-48" />
+   418→   418→            </div>
+   419→   419→          </div>
+   420→   420→          {Array.from({ length: 4 }).map((_, i) => (
+   421→   421→            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+   422→   422→          ))}
+   423→   423→        </div>
+   424→   424→      </div>
+   425→   425→    )
+   426→   426→  }
+   427→   427→
+   428→   428→  if (error || !project) {
+   429→   429→    return (
+   430→   430→      <div className="min-h-screen bg-background flex items-center justify-center">
+   431→   431→        <div className="text-center space-y-4 p-4">
+   432→   432→          <p className="text-destructive">{error || 'Project not found'}</p>
+   433→   433→          <Button variant="outline" onClick={() => navigate('projects')} className="gap-2">
+   434→   434→            <ArrowLeft className="h-4 w-4" />
+   435→   435→            Back to Projects
+   436→   436→          </Button>
+   437→   437→        </div>
+   438→   438→      </div>
+   439→   439→    )
+   440→   440→  }
+   441→   441→
+   442→   442→  const techStackList = parseJSONField(project.techStack)
+   443→   443→  const featuresList = parseJSONField(project.features)
+   444→   444→  const taskStats = project.taskStats
+   445→   445→  const hasMilestones = project.milestones && project.milestones.length > 0
+   446→   446→
+   447→   447→  // Pie chart data
+   448→   448→  const pieData = [
+   449→   449→    { name: 'Not Started', value: taskStats.notStarted },
+   450→   450→    { name: 'In Progress', value: taskStats.inProgress },
+   451→   451→    { name: 'Submitted', value: taskStats.submitted },
+   452→   452→    { name: 'Under Review', value: taskStats.underReview },
+   453→   453→    { name: 'Completed', value: taskStats.verifiedCompleted },
+   454→   454→    { name: 'Overdue', value: taskStats.overdue },
+   455→   455→  ].filter((d) => d.value > 0)
+   456→   456→
+   457→   457→  return (
+   458→   458→    <div className="min-h-screen bg-background">
+   459→   459→      {/* Header */}
+   460→   460→      <div className="border-b bg-background sticky top-0 z-40">
+   461→   461→        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+   462→   462→          <div className="flex items-center gap-3 min-w-0">
+   463→   463→            <Button variant="ghost" size="icon" onClick={() => navigate('projects')}>
+   464→   464→              <ArrowLeft className="h-4 w-4" />
+   465→   465→            </Button>
+   466→   466→            <div className="min-w-0">
+   467→   467→              <div className="flex items-center gap-2 flex-wrap">
+   468→   468→                <h1 className="text-lg font-bold truncate">{project.name}</h1>
+   469→   469→                <Badge
+   470→   470→                  variant="outline"
+   471→   471→                  className={`text-[10px] px-2 py-0 ${statusColors[project.status] || ''}`}
+   472→   472→                >
+   473→   473→                  {project.status.replace(/_/g, ' ')}
+   474→   474→                </Badge>
+   475→   475→              </div>
+   476→   476→            </div>
+   477→   477→          </div>
+   478→   478→          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={openEditDialog}>
+   479→   479→            <Pencil className="h-3.5 w-3.5" />
+   480→   480→            Edit
+   481→   481→          </Button>
+   482→   482→        </div>
+   483→   483→      </div>
+   484→   484→
+   485→   485→      {/* Content */}
+   486→   486→      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+   487→   487→        {error && (
+   488→   488→          <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+   489→   489→            {error}
+   490→   490→          </div>
+   491→   491→        )}
+   492→   492→
+   493→   493→        <Tabs value={activeTab} onValueChange={setActiveTab}>
+   494→   494→          <TabsList className="w-full flex overflow-x-auto mb-6 bg-muted p-1 rounded-lg h-auto gap-1">
+   495→   495→            <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   496→   496→              <FileText className="h-3.5 w-3.5 hidden sm:block" />
+   497→   497→              Overview
+   498→   498→            </TabsTrigger>
+   499→   499→            <TabsTrigger value="tasks" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   500→   500→              <CheckCircle className="h-3.5 w-3.5 hidden sm:block" />
+   501→   501→              Tasks
+   502→   502→            </TabsTrigger>
+   503→   503→            <TabsTrigger value="team" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   504→   504→              <Users className="h-3.5 w-3.5 hidden sm:block" />
+   505→   505→              Team
+   506→   506→            </TabsTrigger>
+   507→   507→            <TabsTrigger value="files" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   508→   508→              <FolderOpen className="h-3.5 w-3.5 hidden sm:block" />
+   509→   509→              Files
+   510→   510→            </TabsTrigger>
+   511→   511→            <TabsTrigger value="ai-planner" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   512→   512→              <Brain className="h-3.5 w-3.5 hidden sm:block" />
+   513→   513→              AI Planner
+   514→   514→            </TabsTrigger>
+   515→   515→            <TabsTrigger value="reports" className="gap-1.5 text-xs sm:text-sm flex-1 shrink-0">
+   516→   516→              <BarChart3 className="h-3.5 w-3.5 hidden sm:block" />
+   517→   517→              Reports
+   518→   518→            </TabsTrigger>
+   519→   519→          </TabsList>
+   520→   520→
+   521→   521→          {/* ==================== OVERVIEW TAB ==================== */}
+   522→   522→          <TabsContent value="overview" className="space-y-6">
+   523→   523→            {/* Description */}
+   524→   524→            <Card>
+   525→   525→              <CardHeader>
+   526→   526→                <CardTitle className="text-base">Description</CardTitle>
+   527→   527→              </CardHeader>
+   528→   528→              <CardContent>
+   529→   529→                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+   530→   530→                  {project.description}
+   531→   531→                </p>
+   532→   532→              </CardContent>
+   533→   533→            </Card>
+   534→   534→
+   535→   535→            {/* Details grid */}
+   536→   536→            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   537→   537→              <Card>
+   538→   538→                <CardHeader>
+   539→   539→                  <CardTitle className="text-base">Project Details</CardTitle>
+   540→   540→                </CardHeader>
+   541→   541→                <CardContent className="space-y-3">
+   542→   542→                  <div className="flex justify-between text-sm">
+   543→   543→                    <span className="text-muted-foreground">Type</span>
+   544→   544→                    <span className="font-medium">{project.projectType}</span>
+   545→   545→                  </div>
+   546→   546→                  <Separator />
+   547→   547→                  <div className="flex justify-between text-sm">
+   548→   548→                    <span className="text-muted-foreground">Deadline</span>
+   549→   549→                    <span className="font-medium">
+   550→   550→                      {project.deadline
+   551→   551→                        ? new Date(project.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+   552→   552→                        : 'Not set'}
+   553→   553→                    </span>
+   554→   554→                  </div>
+   555→   555→                  <Separator />
+   556→   556→                  <div className="flex justify-between text-sm">
+   557→   557→                    <span className="text-muted-foreground">Difficulty</span>
+   558→   558→                    <Badge variant="outline" className="capitalize text-xs">
+   559→   559→                      {project.difficulty || 'medium'}
+   560→   560→                    </Badge>
+   561→   561→                  </div>
+   562→   562→                  <Separator />
+   563→   563→                  <div className="flex justify-between text-sm">
+   564→   564→                    <span className="text-muted-foreground">Status</span>
+   565→   565→                    <Badge
+   566→   566→                      variant="outline"
+   567→   567→                      className={`text-xs capitalize ${statusColors[project.status] || ''}`}
+   568→   568→                    >
+   569→   569→                      {project.status.replace(/_/g, ' ')}
+   570→   570→                    </Badge>
+   571→   571→                  </div>
+   572→   572→                </CardContent>
+   573→   573→              </Card>
+   574→   574→
+   575→   575→              <Card>
+   576→   576→                <CardHeader>
+   577→   577→                  <CardTitle className="text-base">Tech Stack & Features</CardTitle>
+   578→   578→                </CardHeader>
+   579→   579→                <CardContent className="space-y-3">
+   580→   580→                  {techStackList.length > 0 && (
+   581→   581→                    <div>
+   582→   582→                      <p className="text-xs text-muted-foreground mb-2">Tech Stack</p>
+   583→   583→                      <div className="flex flex-wrap gap-1.5">
+   584→   584→                        {techStackList.map((tech) => (
+   585→   585→                          <Badge key={tech} variant="secondary" className="text-xs">
+   586→   586→                            {tech}
+   587→   587→                          </Badge>
+   588→   588→                        ))}
+   589→   589→                      </div>
+   590→   590→                    </div>
+   591→   591→                  )}
+   592→   592→                  {featuresList.length > 0 && (
+   593→   593→                    <div>
+   594→   594→                      <p className="text-xs text-muted-foreground mb-2">Features</p>
+   595→   595→                      <ul className="space-y-1">
+   596→   596→                        {featuresList.map((f, i) => (
+   597→   597→                          <li key={i} className="text-sm flex items-start gap-2">
+   598→   598→                            <CheckCircle className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+   599→   599→                            {f}
+   600→   600→                          </li>
+   601→   601→                        ))}
+   602→   602→                      </ul>
+   603→   603→                    </div>
+   604→   604→                  )}
+   605→   605→                  {!techStackList.length && !featuresList.length && (
+   606→   606→                    <p className="text-sm text-muted-foreground">No tech stack or features defined.</p>
+   607→   607→                  )}
+   608→   608→                </CardContent>
+   609→   609→              </Card>
+   610→   610→            </div>
+   611→   611→
+   612→   612→            {/* Requirements */}
+   613→   613→            {project.requirements && (
+   614→   614→              <Card>
+   615→   615→                <CardHeader>
+   616→   616→                  <CardTitle className="text-base">Requirements</CardTitle>
+   617→   617→                </CardHeader>
+   618→   618→                <CardContent>
+   619→   619→                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+   620→   620→                    {project.requirements}
+   621→   621→                  </p>
+   622→   622→                </CardContent>
+   623→   623→              </Card>
+   624→   624→            )}
+   625→   625→
+   626→   626→            {/* Milestones timeline */}
+   627→   627→            <Card>
+   628→   628→              <CardHeader>
+   629→   629→                <CardTitle className="text-base">Milestones</CardTitle>
+   630→   630→                <CardDescription>{hasMilestones ? `${project.milestones.length} milestones` : 'No milestones yet'}</CardDescription>
+   631→   631→              </CardHeader>
+   632→   632→              <CardContent>
+   633→   633→                {hasMilestones ? (
+   634→   634→                  <div className="space-y-4">
+   635→   635→                    {project.milestones.map((ms, i) => (
+   636→   636→                      <div key={ms.id} className="flex gap-3">
+   637→   637→                        <div className="flex flex-col items-center">
+   638→   638→                          <div
+   639→   639→                            className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+   640→   640→                              ms.status === 'completed'
+   641→   641→                                ? 'bg-emerald-100 text-emerald-700'
+   642→   642→                                : ms.progress > 0
+   643→   643→                                  ? 'bg-amber-100 text-amber-700'
+   644→   644→                                  : 'bg-muted text-muted-foreground'
+   645→   645→                            }`}
+   646→   646→                          >
+   647→   647→                            {i + 1}
+   648→   648→                          </div>
+   649→   649→                          {i < project.milestones.length - 1 && (
+   650→   650→                            <div className="w-0.5 flex-1 bg-border mt-1" />
+   651→   651→                          )}
+   652→   652→                        </div>
+   653→   653→                        <div className="flex-1 pb-4">
+   654→   654→                          <div className="flex items-center justify-between gap-2">
+   655→   655→                            <p className="text-sm font-medium">{ms.title}</p>
+   656→   656→                            <span className="text-xs text-muted-foreground">
+   657→   657→                              {ms._count.tasks} task{ms._count.tasks !== 1 ? 's' : ''}
+   658→   658→                            </span>
+   659→   659→                          </div>
+   660→   660→                          <div className="mt-1.5">
+   661→   661→                            <Progress value={ms.progress} className="h-1.5" />
+   662→   662→                            <p className="text-xs text-muted-foreground mt-1">{Math.round(ms.progress)}% complete</p>
+   663→   663→                          </div>
+   664→   664→                        </div>
+   665→   665→                      </div>
+   666→   666→                    ))}
+   667→   667→                  </div>
+   668→   668→                ) : (
+   669→   669→                  <p className="text-sm text-muted-foreground">Use AI Planner to generate milestones and tasks.</p>
+   670→   670→                )}
+   671→   671→              </CardContent>
+   672→   672→            </Card>
+   673→   673→
+   674→   674→            {/* Task Status Pie Chart */}
+   675→   675→            {taskStats.total > 0 && (
+   676→   676→              <Card>
+   677→   677→                <CardHeader>
+   678→   678→                  <CardTitle className="text-base">Task Progress</CardTitle>
+   679→   679→                  <CardDescription>{taskStats.total} total tasks</CardDescription>
+   680→   680→                </CardHeader>
+   681→   681→                <CardContent>
+   682→   682→                  <div className="flex flex-col sm:flex-row items-center gap-6">
+   683→   683→                    <div className="h-[200px] w-[200px]">
+   684→   684→                      <ResponsiveContainer width="100%" height="100%">
+   685→   685→                        <PieChart>
+   686→   686→                          <Pie
+   687→   687→                            data={pieData}
+   688→   688→                            cx="50%"
+   689→   689→                            cy="50%"
+   690→   690→                            innerRadius={50}
+   691→   691→                            outerRadius={80}
+   692→   692→                            paddingAngle={3}
+   693→   693→                            dataKey="value"
+   694→   694→                          >
+   695→   695→                            {pieData.map((_, index) => (
+   696→   696→                              <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+   697→   697→                            ))}
+   698→   698→                          </Pie>
+   699→   699→                          <Tooltip />
+   700→   700→                          <Legend
+   701→   701→                            iconSize={8}
+   702→   702→                            wrapperStyle={{ fontSize: '12px' }}
+   703→   703→                            formatter={(value: string) => (
+   704→   704→                              <span className="text-xs">{value}</span>
+   705→   705→                            )}
+   706→   706→                          />
+   707→   707→                        </PieChart>
+   708→   708→                      </ResponsiveContainer>
+   709→   709→                    </div>
+   710→   710→                    <div className="grid grid-cols-2 gap-3 flex-1">
+   711→   711→                      {[
+   712→   712→                        { label: 'Not Started', value: taskStats.notStarted, color: PIE_COLORS[0] },
+   713→   713→                        { label: 'In Progress', value: taskStats.inProgress, color: PIE_COLORS[1] },
+   714→   714→                        { label: 'Completed', value: taskStats.verifiedCompleted, color: PIE_COLORS[4] },
+   715→   715→                        { label: 'Overdue', value: taskStats.overdue, color: PIE_COLORS[5] },
+   716→   716→                      ].map((item) => (
+   717→   717→                        <div key={item.label} className="flex items-center gap-2">
+   718→   718→                          <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+   719→   719→                          <div>
+   720→   720→                            <p className="text-xs text-muted-foreground">{item.label}</p>
+   721→   721→                            <p className="text-sm font-semibold">{item.value}</p>
+   722→   722→                          </div>
+   723→   723→                        </div>
+   724→   724→                      ))}
+   725→   725→                    </div>
+   726→   726→                  </div>
+   727→   727→                </CardContent>
+   728→   728→              </Card>
+   729→   729→            )}
+   730→   730→          </TabsContent>
+   731→   731→
+   732→   732→          {/* ==================== TASKS TAB ==================== */}
+   733→   733→          <TabsContent value="tasks" className="space-y-6">
+   734→   734→            {/* Stats summary */}
+   735→   735→            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   736→   736→              {[
+   737→   737→                { label: 'Total Tasks', value: taskStats.total, icon: CheckCircle, color: 'text-muted-foreground' },
+   738→   738→                { label: 'Completed', value: taskStats.verifiedCompleted, icon: CheckCircle, color: 'text-emerald-600' },
+   739→   739→                { label: 'In Progress', value: taskStats.inProgress, icon: Clock, color: 'text-amber-600' },
+   740→   740→                { label: 'Overdue', value: taskStats.overdue, icon: AlertTriangle, color: 'text-red-600' },
+   741→   741→              ].map((stat) => {
+   742→   742→                const Icon = stat.icon
+   743→   743→                return (
+   744→   744→                  <Card key={stat.label}>
+   745→   745→                    <CardContent className="p-4 flex items-center gap-3">
+   746→   746→                      <Icon className={`h-5 w-5 ${stat.color}`} />
+   747→   747→                      <div>
+   748→   748→                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+   749→   749→                        <p className="text-lg font-bold">{stat.value}</p>
+   750→   750→                      </div>
+   751→   751→                    </CardContent>
+   752→   752→                  </Card>
+   753→   753→                )
+   754→   754→              })}
+   755→   755→            </div>
+   756→   756→
+   757→   757→            <Button onClick={() => navigate('tasks', { projectId })} className="gap-2">
+   758→   758→              Go to Tasks
+   759→   759→              <ExternalLink className="h-3.5 w-3.5" />
+   760→   760→            </Button>
+   761→   761→          </TabsContent>
+   762→   762→
+   763→   763→          {/* ==================== TEAM TAB ==================== */}
+   764→   764→          <TabsContent value="team" className="space-y-6">
+   765→   765→            {/* Add member */}
+   766→   766→            <Card>
+   767→   767→              <CardHeader>
+   768→   768→                <CardTitle className="text-base">Add Team Member</CardTitle>
+   769→   769→              </CardHeader>
+   770→   770→              <CardContent>
+   771→   771→                <div className="flex gap-2">
+   772→   772→                  <Input
+   773→   773→                    placeholder="Enter user email or ID"
+   774→   774→                    value={memberEmail}
+   775→   775→                    onChange={(e) => {
+   776→   776→                      setMemberEmail(e.target.value)
+   777→   777→                      setMemberError(null)
+   778→   778→                    }}
+   779→   779→                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMember() } }}
+   780→   780→                  />
+   781→   781→                  <Button onClick={handleAddMember} className="gap-1.5 shrink-0">
+   782→   782→                    <UserPlus className="h-4 w-4" />
+   783→   783→                    Add
+   784→   784→                  </Button>
+   785→   785→                </div>
+   786→   786→                {memberError && (
+   787→   787→                  <p className="text-xs text-destructive mt-2">{memberError}</p>
+   788→   788→                )}
+   789→   789→              </CardContent>
+   790→   790→            </Card>
+   791→   791→
+   792→   792→            {/* Member list */}
+   793→   793→            <div className="space-y-3">
+   794→   794→              {project.members.map((member) => (
+   795→   795→                <Card key={member.userId}>
+   796→   796→                  <CardContent className="p-4 flex items-center gap-4">
+   797→   797→                    <Avatar className="h-10 w-10">
+   798→   798→                      <AvatarImage src={member.user.avatar || ''} />
+   799→   799→                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
+   800→   800→                        {member.user.name?.charAt(0).toUpperCase() || member.user.email.charAt(0).toUpperCase()}
+   801→   801→                      </AvatarFallback>
+   802→   802→                    </Avatar>
+   803→   803→                    <div className="flex-1 min-w-0">
+   804→   804→                      <p className="text-sm font-medium truncate">
+   805→   805→                        {member.user.name || member.user.email}
+   806→   806→                      </p>
+   807→   807→                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+   808→   808→                        <Badge variant="outline" className="text-[10px] capitalize px-1.5">
+   809→   809→                          {member.role}
+   810→   810→                        </Badge>
+   811→   811→                        <span>Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+   812→   812→                      </div>
+   813→   813→                    </div>
+   814→   814→                    {analytics?.teamStats && (() => {
+   815→   815→                      const stat = (analytics.teamStats as AnalyticsTeamStat[]).find(
+   816→   816→                        (s) => s.userId === member.userId
+   817→   817→                      )
+   818→   818→                      if (!stat) return null
+   819→   819→                      return (
+   820→   820→                        <div className="text-right text-xs hidden sm:block">
+   821→   821→                          <p className="text-muted-foreground">{stat.totalTasks} tasks</p>
+   822→   822→                          <p className="font-medium text-emerald-600">{stat.completedTasks} done</p>
+   823→   823→                        </div>
+   824→   824→                      )
+   825→   825→                    })()}
+   826→   826→                  </CardContent>
+   827→   827→                </Card>
+   828→   828→              ))}
+   829→   829→            </div>
+   830→   830→          </TabsContent>
+   831→   831→
+   832→   832→          {/* ==================== FILES TAB ==================== */}
+   833→   833→          <TabsContent value="files" className="space-y-4">
+   834→   834→            {/* Upload area */}
+   835→   835→            <Card>
+   836→   836→              <CardContent className="p-6">
+   837→   837→                <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+   838→   838→                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+   839→   839→                  <p className="text-sm font-medium">Drop files here or click to upload</p>
+   840→   840→                  <p className="text-xs text-muted-foreground mt-1">Supports all file types</p>
+   841→   841→                  <input
+   842→   842→                    type="file"
+   843→   843→                    id="file-upload"
+   844→   844→                    className="hidden"
+   845→   845→                    onChange={handleFileUpload}
+   846→   846→                    disabled={uploadingFile}
+   847→   847→                  />
+   848→   848→                  <label htmlFor="file-upload" className="mt-3 inline-block">
+   849→   849→                    <Button
+   850→   850→                      variant="outline"
+   851→   851→                      size="sm"
+   852→   852→                      className="gap-1.5 cursor-pointer"
+   853→   853→                      asChild
+   854→   854→                      disabled={uploadingFile}
+   855→   855→                    >
+   856→   856→                      <span>
+   857→   857→                        {uploadingFile ? (
+   858→   858→                          <>
+   859→   859→                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   860→   860→                            Uploading...
+   861→   861→                          </>
+   862→   862→                        ) : (
+   863→   863→                          <>
+   864→   864→                            <Upload className="h-3.5 w-3.5" />
+   865→   865→                            Choose File
+   866→   866→                          </>
+   867→   867→                        )}
+   868→   868→                      </span>
+   869→   869→                    </Button>
+   870→   870→                  </label>
+   871→   871→                </div>
+   872→   872→              </CardContent>
+   873→   873→            </Card>
+   874→   874→
+   875→   875→            {/* File list */}
+   876→   876→            {files.length > 0 ? (
+   877→   877→              <div className="space-y-2 max-h-96 overflow-y-auto">
+   878→   878→                {files.map((file) => (
+   879→   879→                  <Card key={file.id}>
+   880→   880→                    <CardContent className="p-4 flex items-center gap-3">
+   881→   881→                      <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+   882→   882→                        <FileText className="h-4 w-4 text-muted-foreground" />
+   883→   883→                      </div>
+   884→   884→                      <div className="flex-1 min-w-0">
+   885→   885→                        <p className="text-sm font-medium truncate">{file.fileName}</p>
+   886→   886→                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+   887→   887→                          <span>{file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}</span>
+   888→   888→                          <span>{new Date(file.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+   889→   889→                        </div>
+   890→   890→                      </div>
+   891→   891→                      <Button
+   892→   892→                        variant="ghost"
+   893→   893→                        size="icon"
+   894→   894→                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+   895→   895→                        onClick={() => handleFileDelete(file.id)}
+   896→   896→                      >
+   897→   897→                        <Trash2 className="h-4 w-4" />
+   898→   898→                      </Button>
+   899→   899→                    </CardContent>
+   900→   900→                  </Card>
+   901→   901→                ))}
+   902→   902→              </div>
+   903→   903→            ) : (
+   904→   904→              <Card>
+   905→   905→                <CardContent className="p-8 text-center">
+   906→   906→                  <FolderOpen className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+   907→   907→                  <p className="text-sm text-muted-foreground">No files uploaded yet.</p>
+   908→   908→                </CardContent>
+   909→   909→              </Card>
+   910→   910→            )}
+   911→   911→          </TabsContent>
+   912→   912→
+   913→   913→          {/* ==================== AI PLANNER TAB ==================== */}
+   914→   914→          <TabsContent value="ai-planner" className="space-y-6">
+   915→   915→            {!hasMilestones ? (
+   916→   916→              <Card>
+   917→   917→                <CardContent className="p-12 text-center space-y-4">
+   918→   918→                  <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+   919→   919→                    <Brain className="h-8 w-8 text-primary" />
+   920→   920→                  </div>
+   921→   921→                  <h3 className="text-lg font-semibold">AI Project Planner</h3>
+   922→   922→                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+   923→   923→                    Let AI analyze your project details and generate a complete plan with milestones,
+   924→   924→                    tasks, dependencies, and time estimates.
+   925→   925→                  </p>
+   926→   926→                  <Button
+   927→   927→                    size="lg"
+   928→   928→                    onClick={handleGeneratePlan}
+   929→   929→                    disabled={generatingPlan}
+   930→   930→                    className="gap-2"
+   931→   931→                  >
+   932→   932→                    {generatingPlan ? (
+   933→   933→                      <>
+   934→   934→                        <Loader2 className="h-4 w-4 animate-spin" />
+   935→   935→                        Generating Plan...
+   936→   936→                      </>
+   937→   937→                    ) : (
+   938→   938→                      <>
+   939→   939→                        <Sparkles className="h-4 w-4" />
+   940→   940→                        Generate AI Project Plan
+   941→   941→                      </>
+   942→   942→                    )}
+   943→   943→                  </Button>
+   944→   944→                </CardContent>
+   945→   945→              </Card>
+   946→   946→            ) : (
+   947→   947→              <div className="space-y-4">
+   948→   948→                <div className="flex items-center justify-between">
+   949→   949→                  <h3 className="text-base font-semibold">Generated Plan</h3>
+   950→   950→                  <Badge variant="outline" className="text-xs">
+   951→   951→                    {project.milestones.length} milestones
+   952→   952→                  </Badge>
+   953→   953→                </div>
+   954→   954→
+   955→   955→                {/* Milestone timeline with tasks */}
+   956→   956→                <div className="space-y-3">
+   957→   957→                  {project.milestones.map((ms, idx) => (
+   958→   958→                    <Card key={ms.id}>
+   959→   959→                      <CardHeader className="pb-2 cursor-pointer" onClick={() => {
+   960→   960→                        const el = document.getElementById(`ms-tasks-${ms.id}`)
+   961→   961→                        if (el) {
+   962→   962→                          const isHidden = el.classList.contains('hidden')
+   963→   963→                          el.classList.toggle('hidden')
+   964→   964→                          if (isHidden) fetchMilestoneTasks(ms.id)
+   965→   965→                        }
+   966→   966→                      }}>
+   967→   967→                        <div className="flex items-center justify-between">
+   968→   968→                          <div className="flex items-center gap-3">
+   969→   969→                            <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${
+   970→   970→                              ms.status === 'completed'
+   971→   971→                                ? 'bg-emerald-100 text-emerald-700'
+   972→   972→                                : ms.progress > 0
+   973→   973→                                  ? 'bg-amber-100 text-amber-700'
+   974→   974→                                  : 'bg-muted text-muted-foreground'
+   975→   975→                            }`}>
+   976→   976→                              {idx + 1}
+   977→   977→                            </div>
+   978→   978→                            <div>
+   979→   979→                              <CardTitle className="text-sm">{ms.title}</CardTitle>
+   980→   980→                              <p className="text-xs text-muted-foreground">{ms._count.tasks} tasks</p>
+   981→   981→                            </div>
+   982→   982→                          </div>
+   983→   983→                          <div className="flex items-center gap-2">
+   984→   984→                            <Progress value={ms.progress} className="h-1.5 w-20 hidden sm:block" />
+   985→   985→                            <span className="text-xs text-muted-foreground">{Math.round(ms.progress)}%</span>
+   986→   986→                          </div>
+   987→   987→                        </div>
+   988→   988→                      </CardHeader>
+   989→   989→                      <CardContent id={`ms-tasks-${ms.id}`} className="hidden pt-0">
+   990→   990→                        <Separator className="mb-3" />
+   991→   991→                        {milestoneTasks[ms.id] && milestoneTasks[ms.id].length > 0 ? (
+   992→   992→                          <div className="space-y-1.5">
+   993→   993→                            {milestoneTasks[ms.id].map((task: any) => (
+   994→   994→                              <div key={task.id} className="flex items-center gap-2 text-sm py-1">
+   995→   995→                                <Badge
+   996→   996→                                  variant="outline"
+   997→   997→                                  className={`text-[10px] px-1.5 py-0 shrink-0 ${
+   998→   998→                                    task.status === 'verified_completed'
+   999→   999→                                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  1000→  1000→                                      : task.status === 'in_progress'
+  1001→  1001→                                        ? 'bg-amber-100 text-amber-700 border-amber-200'
+  1002→  1002→                                        : task.status === 'overdue'
+  1003→  1003→                                          ? 'bg-red-100 text-red-700 border-red-200'
+  1004→  1004→                                          : 'bg-slate-100 text-slate-600 border-slate-200'
+  1005→  1005→                                  }`}
+  1006→  1006→                                >
+  1007→  1007→                                  {task.status.replace(/_/g, ' ')}
+  1008→  1008→                                </Badge>
+  1009→  1009→                                <span className="flex-1 truncate">{task.title}</span>
+  1010→  1010→                                {task.assignee && (
+  1011→  1011→                                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+  1012→  1012→                                    {task.assignee.name || task.assignee.email}
+  1013→  1013→                                  </span>
+  1014→  1014→                                )}
+  1015→  1015→                              </div>
+  1016→  1016→                            ))}
+  1017→  1017→                          </div>
+  1018→  1018→                        ) : (
+  1019→  1019→                          <p className="text-xs text-muted-foreground">
+  1020→  1020→                            {milestoneTasks[ms.id] ? 'No tasks in this milestone.' : 'Loading tasks...'}
+  1021→  1021→                          </p>
+  1022→  1022→                        )}
+  1023→  1023→                      </CardContent>
+  1024→  1024→                    </Card>
+  1025→  1025→                  ))}
+  1026→  1026→                </div>
+  1027→  1027→              </div>
+  1028→  1028→            )}
+  1029→  1029→          </TabsContent>
+  1030→  1030→
+  1031→  1031→          {/* ==================== REPORTS TAB ==================== */}
+  1032→  1032→          <TabsContent value="reports" className="space-y-6">
+  1033→  1033→            {reports.length > 0 ? (
+  1034→  1034→              reports.map((report) => (
+  1035→  1035→                <Card key={report.id}>
+  1036→  1036→                  <CardHeader>
+  1037→  1037→                    <div className="flex items-center justify-between">
+  1038→  1038→                      <div>
+  1039→  1039→                        <CardTitle className="text-base">Project Report</CardTitle>
+  1040→  1040→                        <CardDescription>
+  1041→  1041→                          Generated {new Date(report.generatedAt).toLocaleDateString('en-US', {
+  1042→  1042→                            month: 'long',
+  1043→  1043→                            day: 'numeric',
+  1044→  1044→                            year: 'numeric',
+  1045→  1045→                          })}
+  1046→  1046→                        </CardDescription>
+  1047→  1047→                      </div>
+  1048→  1048→                    </div>
+  1049→  1049→                  </CardHeader>
+  1050→  1050→                  <CardContent className="space-y-4">
+  1051→  1051→                    {report.overallAssessment && (
+  1052→  1052→                      <div>
+  1053→  1053→                        <h4 className="text-sm font-semibold mb-1">Overall Assessment</h4>
+  1054→  1054→                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{report.overallAssessment}</p>
+  1055→  1055→                      </div>
+  1056→  1056→                    )}
+  1057→  1057→                    {report.summary && (
+  1058→  1058→                      <div>
+  1059→  1059→                        <h4 className="text-sm font-semibold mb-1">Summary</h4>
+  1060→  1060→                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{report.summary}</p>
+  1061→  1061→                      </div>
+  1062→  1062→                    )}
+  1063→  1063→                    {(() => {
+  1064→  1064→                      const strengths = parseJSONField(report.strengths)
+  1065→  1065→                      if (strengths.length > 0) return (
+  1066→  1066→                        <div>
+  1067→  1067→                          <h4 className="text-sm font-semibold mb-2">Strengths</h4>
+  1068→  1068→                          <ul className="space-y-1">
+  1069→  1069→                            {strengths.map((s: string, i: number) => (
+  1070→  1070→                              <li key={i} className="text-sm flex items-start gap-2 text-muted-foreground">
+  1071→  1071→                                <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+  1072→  1072→                                {s}
+  1073→  1073→                              </li>
+  1074→  1074→                            ))}
+  1075→  1075→                          </ul>
+  1076→  1076→                        </div>
+  1077→  1077→                      )
+  1078→  1078→                    })()}
+  1079→  1079→                    {(() => {
+  1080→  1080→                      const weaknesses = parseJSONField(report.weaknesses)
+  1081→  1081→                      if (weaknesses.length > 0) return (
+  1082→  1082→                        <div>
+  1083→  1083→                          <h4 className="text-sm font-semibold mb-2">Areas for Improvement</h4>
+  1084→  1084→                          <ul className="space-y-1">
+  1085→  1085→                            {weaknesses.map((w: string, i: number) => (
+  1086→  1086→                              <li key={i} className="text-sm flex items-start gap-2 text-muted-foreground">
+  1087→  1087→                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+  1088→  1088→                                {w}
+  1089→  1089→                              </li>
+  1090→  1090→                            ))}
+  1091→  1091→                          </ul>
+  1092→  1092→                        </div>
+  1093→  1093→                      )
+  1094→  1094→                    })()}
+  1095→  1095→                    {report.recommendedSkills && (() => {
+  1096→  1096→                      const skills = parseJSONField(report.recommendedSkills)
+  1097→  1097→                      if (skills.length > 0) return (
+  1098→  1098→                        <div>
+  1099→  1099→                          <h4 className="text-sm font-semibold mb-2">Recommended Skills</h4>
+  1100→  1100→                          <div className="flex flex-wrap gap-1.5">
+  1101→  1101→                            {skills.map((s: string, i: number) => (
+  1102→  1102→                              <Badge key={i} variant="secondary" className="text-xs">{s}</Badge>
+  1103→  1103→                            ))}
+  1104→  1104→                          </div>
+  1105→  1105→                        </div>
+  1106→  1106→                      )
+  1107→  1107→                    })()}
+  1108→  1108→                    {report.futureImprovements && (
+  1109→  1109→                      <div>
+  1110→  1110→                        <h4 className="text-sm font-semibold mb-1">Future Improvements</h4>
+  1111→  1111→                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{report.futureImprovements}</p>
+  1112→  1112→                      </div>
+  1113→  1113→                    )}
+  1114→  1114→                  </CardContent>
+  1115→  1115→                </Card>
+  1116→  1116→              ))
+  1117→  1117→            ) : project.status === 'completed' ? (
+  1118→  1118→              <Card>
+  1119→  1119→                <CardContent className="p-8 text-center space-y-4">
+  1120→  1120→                  <BarChart3 className="h-10 w-10 mx-auto text-muted-foreground" />
+  1121→  1121→                  <p className="text-sm text-muted-foreground">No reports generated yet.</p>
+  1122→  1122→                  <Button onClick={handleGenerateReport} disabled={generatingReport} className="gap-2">
+  1123→  1123→                    {generatingReport ? (
+  1124→  1124→                      <>
+  1125→  1125→                        <Loader2 className="h-4 w-4 animate-spin" />
+  1126→  1126→                        Generating...
+  1127→  1127→                      </>
+  1128→  1128→                    ) : (
+  1129→  1129→                      <>
+  1130→  1130→                        <Sparkles className="h-4 w-4" />
+  1131→  1131→                        Generate Report
+  1132→  1132→                      </>
+  1133→  1133→                    )}
+  1134→  1134→                  </Button>
+  1135→  1135→                </CardContent>
+  1136→  1136→              </Card>
+  1137→  1137→            ) : (
+  1138→  1138→              <Card>
+  1139→  1139→                <CardContent className="p-8 text-center space-y-4">
+  1140→  1140→                  <BarChart3 className="h-10 w-10 mx-auto text-muted-foreground" />
+  1141→  1141→                  <h3 className="text-base font-medium">Report Not Available</h3>
+  1142→  1142→                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+  1143→  1143→                    Complete the project to generate a comprehensive AI-powered report with insights,
+  1144→  1144→                    strengths analysis, and recommendations.
+  1145→  1145→                  </p>
+  1146→  1146→                  <Button
+  1147→  1147→                    onClick={handleGenerateReport}
+  1148→  1148→                    disabled={generatingReport}
+  1149→  1149→                    variant="outline"
+  1150→  1150→                    className="gap-2"
+  1151→  1151→                  >
+  1152→  1152→                    {generatingReport ? (
+  1153→  1153→                      <>
+  1154→  1154→                        <Loader2 className="h-4 w-4 animate-spin" />
+  1155→  1155→                        Generating...
+  1156→  1156→                      </>
+  1157→  1157→                    ) : (
+  1158→  1158→                      <>
+  1159→  1159→                        <Sparkles className="h-4 w-4" />
+  1160→  1160→                        Complete Project & Generate Report
+  1161→  1161→                      </>
+  1162→  1162→                    )}
+  1163→  1163→                  </Button>
+  1164→  1164→                </CardContent>
+  1165→  1165→              </Card>
+  1166→  1166→            )}
+  1167→  1167→          </TabsContent>
+  1168→  1168→        </Tabs>
+  1169→  1169→      </div>
+  1170→  1170→
+  1171→  1171→      {/* Edit Project Dialog */}
+  1172→  1172→      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+  1173→  1173→        <DialogContent>
+  1174→  1174→          <DialogHeader>
+  1175→  1175→            <DialogTitle>Edit Project</DialogTitle>
+  1176→  1176→            <DialogDescription>Update the project name and description.</DialogDescription>
+  1177→  1177→          </DialogHeader>
+  1178→  1178→          <div className="space-y-4 py-2">
+  1179→  1179→            <div className="space-y-2">
+  1180→  1180→              <Label htmlFor="edit-name">Name</Label>
+  1181→  1181→              <Input
+  1182→  1182→                id="edit-name"
+  1183→  1183→                value={editName}
+  1184→  1184→                onChange={(e) => setEditName(e.target.value)}
+  1185→  1185→                placeholder="Project name"
+  1186→  1186→              />
+  1187→  1187→            </div>
+  1188→  1188→            <div className="space-y-2">
+  1189→  1189→              <Label htmlFor="edit-description">Description</Label>
+  1190→  1190→              <Textarea
+  1191→  1191→                id="edit-description"
+  1192→  1192→                value={editDescription}
+  1193→  1193→                onChange={(e) => setEditDescription(e.target.value)}
+  1194→  1194→                placeholder="Project description"
+  1195→  1195→                rows={4}
+  1196→  1196→              />
+  1197→  1197→            </div>
+  1198→  1198→          </div>
+  1199→  1199→          <DialogFooter>
+  1200→  1200→            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+  1201→  1201→            <Button onClick={handleSaveEdit} disabled={savingEdit || !editName.trim()}>
+  1202→  1202→              {savingEdit ? (
+  1203→  1203→                <>
+  1204→  1204→                  <Loader2 className="h-4 w-4 animate-spin" />
+  1205→  1205→                  Saving...
+  1206→  1206→                </>
+  1207→  1207→              ) : (
+  1208→  1208→                'Save'
+  1209→  1209→              )}
+  1210→  1210→            </Button>
+  1211→  1211→          </DialogFooter>
+  1212→  1212→        </DialogContent>
+  1213→  1213→      </Dialog>
+  1214→  1214→    </div>
+  1215→  1215→  )
+  1216→  1216→}
+  1217→  1217→

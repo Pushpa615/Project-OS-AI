@@ -8,7 +8,8 @@ import { aiGenerateReport } from '@/lib/ai'
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireAuth(req)
-    const sessionUserId = auth.error ? undefined : auth.user.id
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
 
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')

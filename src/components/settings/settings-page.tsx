@@ -245,7 +245,7 @@ export function SettingsPage({ userId, userEmail }: { userId: string; userEmail?
     }
     setSaving('security')
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

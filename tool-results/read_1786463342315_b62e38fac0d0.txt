@@ -1,0 +1,748 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useMemo, useCallback } from 'react'
+     4→import { useNavStore } from '@/lib/nav-store'
+     5→import { useToast } from '@/hooks/use-toast'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+     8→import { Badge } from '@/components/ui/badge'
+     9→import { Skeleton } from '@/components/ui/skeleton'
+    10→import { Separator } from '@/components/ui/separator'
+    11→import { Input } from '@/components/ui/input'
+    12→import { Textarea } from '@/components/ui/textarea'
+    13→import { Label } from '@/components/ui/label'
+    14→import {
+    15→  Dialog,
+    16→  DialogContent,
+    17→  DialogDescription,
+    18→  DialogFooter,
+    19→  DialogHeader,
+    20→  DialogTitle,
+    21→} from '@/components/ui/dialog'
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→} from '@/components/ui/select'
+    29→import {
+    30→  ChevronLeft,
+    31→  ChevronRight,
+    32→  CalendarDays,
+    33→  Target,
+    34→  Clock,
+    35→  AlertTriangle,
+    36→  Users,
+    37→  Plus,
+    38→  Loader2,
+    39→  ExternalLink,
+    40→} from 'lucide-react'
+    41→import {
+    42→  format,
+    43→  startOfMonth,
+    44→  endOfMonth,
+    45→  startOfWeek,
+    46→  endOfWeek,
+    47→  addMonths,
+    48→  subMonths,
+    49→  isSameMonth,
+    50→  isSameDay,
+    51→  isToday,
+    52→  parseISO,
+    53→  eachDayOfInterval,
+    54→  isBefore,
+    55→  startOfDay,
+    56→} from 'date-fns'
+    57→
+    58→type EventType = 'milestone' | 'task' | 'meeting'
+    59→
+    60→interface CalendarEvent {
+    61→  id: string
+    62→  type: EventType
+    63→  title: string
+    64→  description?: string | null
+    65→  startDate: string | null
+    66→  endDate: string | null
+    67→  allDay: boolean
+    68→  color: string
+    69→  status?: string
+    70→  priority?: string
+    71→  assignee?: { id: string; name: string; avatar?: string | null } | null
+    72→  milestone?: { id: string; title: string } | null
+    73→}
+    74→
+    75→interface UserProject {
+    76→  id: string
+    77→  name: string
+    78→}
+    79→
+    80→interface CalendarPageProps {
+    81→  userId: string
+    82→  projectId?: string
+    83→}
+    84→
+    85→const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    86→
+    87→const TYPE_ICONS: Record<EventType, typeof Target> = {
+    88→  milestone: Target,
+    89→  task: Clock,
+    90→  meeting: Users,
+    91→}
+    92→
+    93→const TYPE_COLORS: Record<EventType, string> = {
+    94→  milestone: 'bg-emerald-500',
+    95→  task: 'bg-amber-500',
+    96→  meeting: 'bg-violet-500',
+    97→}
+    98→
+    99→const DURATION_OPTIONS = [
+   100→  { value: '15', label: '15 minutes' },
+   101→  { value: '30', label: '30 minutes' },
+   102→  { value: '45', label: '45 minutes' },
+   103→  { value: '60', label: '1 hour' },
+   104→  { value: '90', label: '1.5 hours' },
+   105→  { value: '120', label: '2 hours' },
+   106→  { value: '180', label: '3 hours' },
+   107→]
+   108→
+   109→export function CalendarPage({ userId, projectId }: CalendarPageProps) {
+   110→  const navigate = useNavStore((s) => s.navigate)
+   111→  const { toast } = useToast()
+   112→  const [currentMonth, setCurrentMonth] = useState(new Date())
+   113→  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+   114→  const [events, setEvents] = useState<CalendarEvent[]>([])
+   115→  const [loading, setLoading] = useState(true)
+   116→  const [error, setError] = useState<string | null>(null)
+   117→
+   118→  // New event dialog state
+   119→  const [dialogOpen, setDialogOpen] = useState(false)
+   120→  const [dialogDate, setDialogDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
+   121→  const [eventType, setEventType] = useState<'meeting' | 'milestone'>('meeting')
+   122→  const [eventTitle, setEventTitle] = useState('')
+   123→  const [eventDescription, setEventDescription] = useState('')
+   124→  const [eventDuration, setEventDuration] = useState('60')
+   125→  const [eventProjectId, setEventProjectId] = useState('')
+   126→  const [userProjects, setUserProjects] = useState<UserProject[]>([])
+   127→  const [submitting, setSubmitting] = useState(false)
+   128→
+   129→  // Fetch user projects for the dialog
+   130→  const fetchUserProjects = useCallback(async () => {
+   131→    try {
+   132→      const res = await fetch(`/api/projects?userId=${userId}`)
+   133→      const json = await res.json()
+   134→      if (json.data) {
+   135→        setUserProjects(json.data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
+   136→        // Default to the current project if available
+   137→        if (projectId && json.data.some((p: { id: string }) => p.id === projectId)) {
+   138→          setEventProjectId(projectId)
+   139→        } else if (json.data.length > 0) {
+   140→          setEventProjectId(json.data[0].id)
+   141→        }
+   142→      }
+   143→    } catch {
+   144→      // Silently fail for projects fetch
+   145→    }
+   146→  }, [userId, projectId])
+   147→
+   148→  const fetchEvents = useCallback(async () => {
+   149→    if (!projectId) return
+   150→    setLoading(true)
+   151→    setError(null)
+   152→    try {
+   153→      const res = await fetch(`/api/calendar?projectId=${projectId}`)
+   154→      const json = await res.json()
+   155→      if (json.error) {
+   156→        setError(json.error)
+   157→      } else {
+   158→        setEvents(json.data || [])
+   159→      }
+   160→    } catch {
+   161→      setError('Failed to load calendar events')
+   162→    } finally {
+   163→      setLoading(false)
+   164→    }
+   165→  }, [projectId])
+   166→
+   167→  useEffect(() => {
+   168→    fetchEvents()
+   169→  }, [fetchEvents])
+   170→
+   171→  useEffect(() => {
+   172→    fetchUserProjects()
+   173→  }, [fetchUserProjects])
+   174→
+   175→  const openNewEventDialog = useCallback(
+   176→    (date?: Date) => {
+   177→      setDialogDate(date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+   178→      setEventType('meeting')
+   179→      setEventTitle('')
+   180→      setEventDescription('')
+   181→      setEventDuration('60')
+   182→      if (projectId) {
+   183→        setEventProjectId(projectId)
+   184→      }
+   185→      setDialogOpen(true)
+   186→    },
+   187→    [projectId]
+   188→  )
+   189→
+   190→  const handleSubmitEvent = useCallback(async () => {
+   191→    if (!eventTitle.trim()) {
+   192→      toast({ title: 'Title is required', variant: 'destructive' })
+   193→      return
+   194→    }
+   195→    if (!eventProjectId) {
+   196→      toast({ title: 'Please select a project', variant: 'destructive' })
+   197→      return
+   198→    }
+   199→
+   200→    setSubmitting(true)
+   201→    try {
+   202→      const payload: Record<string, unknown> = {
+   203→        type: eventType,
+   204→        projectId: eventProjectId,
+   205→        title: eventTitle.trim(),
+   206→        date: dialogDate,
+   207→        description: eventDescription.trim(),
+   208→        userId,
+   209→      }
+   210→
+   211→      if (eventType === 'meeting') {
+   212→        payload.duration = parseInt(eventDuration, 10)
+   213→        payload.createdBy = userId
+   214→      }
+   215→
+   216→      const res = await fetch('/api/calendar', {
+   217→        method: 'POST',
+   218→        headers: { 'Content-Type': 'application/json' },
+   219→        body: JSON.stringify(payload),
+   220→      })
+   221→
+   222→      const json = await res.json()
+   223→
+   224→      if (json.error) {
+   225→        toast({ title: json.error, variant: 'destructive' })
+   226→        return
+   227→      }
+   228→
+   229→      toast({
+   230→        title: `${eventType === 'meeting' ? 'Meeting' : 'Milestone'} created`,
+   231→        description: eventTitle.trim(),
+   232→      })
+   233→
+   234→      setDialogOpen(false)
+   235→
+   236→      // Refresh events
+   237→      await fetchEvents()
+   238→
+   239→      // If the event was created for the currently viewed project, also refresh user projects
+   240→      // to ensure the list stays current
+   241→    } catch {
+   242→      toast({ title: 'Failed to create event', variant: 'destructive' })
+   243→    } finally {
+   244→      setSubmitting(false)
+   245→    }
+   246→  }, [eventType, eventProjectId, eventTitle, dialogDate, eventDescription, eventDuration, userId, toast, fetchEvents])
+   247→
+   248→  const calendarDays = useMemo(() => {
+   249→    const monthStart = startOfMonth(currentMonth)
+   250→    const monthEnd = endOfMonth(currentMonth)
+   251→    const calStart = startOfWeek(monthStart)
+   252→    const calEnd = endOfWeek(monthEnd)
+   253→    return eachDayOfInterval({ start: calStart, end: calEnd })
+   254→  }, [currentMonth])
+   255→
+   256→  const getEventsForDay = useCallback(
+   257→    (day: Date) => {
+   258→      return events.filter((e) => {
+   259→        const eventDate = e.startDate || e.endDate
+   260→        if (!eventDate) return false
+   261→        try {
+   262→          const d = parseISO(eventDate)
+   263→          return isSameDay(d, day)
+   264→        } catch {
+   265→          return false
+   266→        }
+   267→      })
+   268→    },
+   269→    [events]
+   270→  )
+   271→
+   272→  const selectedDayEvents = useMemo(() => {
+   273→    if (!selectedDate) return []
+   274→    return getEventsForDay(selectedDate)
+   275→  }, [selectedDate, getEventsForDay])
+   276→
+   277→  const getEventDisplayColor = useCallback((event: CalendarEvent) => {
+   278→    if (event.color === '#ef4444' || event.color === '#dc2626') return 'bg-red-500'
+   279→    if (event.color === '#22c55e') return 'bg-emerald-500'
+   280→    if (event.color === '#f59e0b' || event.color === '#ca8a04' || event.color === '#ea580c')
+   281→      return 'bg-amber-500'
+   282→    if (event.color === '#6366f1' || event.color === '#8b5cf6') return 'bg-violet-500'
+   283→    return 'bg-gray-500'
+   284→  }, [])
+   285→
+   286→  const getEventBorderClass = useCallback((event: CalendarEvent) => {
+   287→    const color = getEventDisplayColor(event)
+   288→    return color.replace('bg-', 'border-')
+   289→  }, [getEventDisplayColor])
+   290→
+   291→  const handleEventClick = useCallback(
+   292→    (event: CalendarEvent) => {
+   293→      if (event.type === 'task') {
+   294→        navigate('task-detail', { id: event.id })
+   295→      } else if (event.type === 'milestone' && projectId) {
+   296→        navigate('project-detail', { id: projectId })
+   297→      } else if (event.type === 'meeting' && projectId) {
+   298→        navigate('project-detail', { id: projectId })
+   299→      }
+   300→    },
+   301→    [navigate, projectId]
+   302→  )
+   303→
+   304→  const handleDateClick = useCallback(
+   305→    (day: Date) => {
+   306→      setSelectedDate(day)
+   307→    },
+   308→    []
+   309→  )
+   310→
+   311→  const prevMonth = () => setCurrentMonth((m) => subMonths(m, 1))
+   312→  const nextMonth = () => setCurrentMonth((m) => addMonths(m, 1))
+   313→  const goToday = () => {
+   314→    setCurrentMonth(new Date())
+   315→    setSelectedDate(new Date())
+   316→  }
+   317→
+   318→  const isOverdue = (event: CalendarEvent) => {
+   319→    if (event.status === 'overdue') return true
+   320→    if (event.type === 'task' && event.endDate) {
+   321→      try {
+   322→        return isBefore(parseISO(event.endDate), startOfDay(new Date()))
+   323→      } catch {
+   324→        return false
+   325→      }
+   326→    }
+   327→    return false
+   328→  }
+   329→
+   330→  // No project selected
+   331→  if (!projectId) {
+   332→    return (
+   333→      <div className="min-h-screen flex items-center justify-center p-4">
+   334→        <div className="text-center space-y-4">
+   335→          <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+   336→            <CalendarDays className="h-8 w-8 text-muted-foreground" />
+   337→          </div>
+   338→          <div>
+   339→            <h2 className="text-xl font-semibold">No Project Selected</h2>
+   340→            <p className="text-sm text-muted-foreground mt-1">
+   341→              Select a project to view its calendar.
+   342→            </p>
+   343→          </div>
+   344→          <Button onClick={() => navigate('projects')}>View Projects</Button>
+   345→        </div>
+   346→      </div>
+   347→    )
+   348→  }
+   349→
+   350→  return (
+   351→    <div className="min-h-screen bg-background">
+   352→      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+   353→        {/* Header */}
+   354→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   355→          <div className="flex items-center gap-3">
+   356→            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+   357→              <CalendarDays className="h-5 w-5 text-primary" />
+   358→            </div>
+   359→            <div>
+   360→              <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
+   361→              <p className="text-sm text-muted-foreground">Project timeline and events</p>
+   362→            </div>
+   363→          </div>
+   364→          <div className="flex items-center gap-2">
+   365→            <Button variant="outline" size="sm" onClick={goToday}>
+   366→              Today
+   367→            </Button>
+   368→            <Button size="sm" onClick={() => openNewEventDialog(selectedDate || undefined)}>
+   369→              <Plus className="h-4 w-4 mr-1.5" />
+   370→              New Event
+   371→            </Button>
+   372→          </div>
+   373→        </div>
+   374→
+   375→        {/* Month Navigation */}
+   376→        <Card>
+   377→          <CardHeader className="pb-3">
+   378→            <div className="flex items-center justify-between">
+   379→              <Button variant="ghost" size="icon" onClick={prevMonth}>
+   380→                <ChevronLeft className="h-5 w-5" />
+   381→              </Button>
+   382→              <CardTitle className="text-lg font-semibold">
+   383→                {format(currentMonth, 'MMMM yyyy')}
+   384→              </CardTitle>
+   385→              <Button variant="ghost" size="icon" onClick={nextMonth}>
+   386→                <ChevronRight className="h-5 w-5" />
+   387→              </Button>
+   388→            </div>
+   389→          </CardHeader>
+   390→          <CardContent>
+   391→            {loading ? (
+   392→              <div className="space-y-2">
+   393→                <div className="grid grid-cols-7 gap-1">
+   394→                  {Array.from({ length: 7 }).map((_, i) => (
+   395→                    <Skeleton key={i} className="h-8 w-full rounded" />
+   396→                  ))}
+   397→                </div>
+   398→                {Array.from({ length: 5 }).map((_, row) => (
+   399→                  <div key={row} className="grid grid-cols-7 gap-1">
+   400→                    {Array.from({ length: 7 }).map((_, col) => (
+   401→                      <Skeleton key={col} className="h-20 w-full rounded" />
+   402→                    ))}
+   403→                  </div>
+   404→                ))}
+   405→              </div>
+   406→            ) : error ? (
+   407→              <div className="flex flex-col items-center justify-center py-12 text-center">
+   408→                <AlertTriangle className="h-10 w-10 text-destructive mb-3" />
+   409→                <p className="text-sm text-muted-foreground">{error}</p>
+   410→                <Button variant="outline" size="sm" className="mt-3" onClick={fetchEvents}>
+   411→                  Retry
+   412→                </Button>
+   413→              </div>
+   414→            ) : (
+   415→              <>
+   416→                {/* Day headers */}
+   417→                <div className="grid grid-cols-7 gap-1 mb-1">
+   418→                  {DAYS_OF_WEEK.map((day) => (
+   419→                    <div
+   420→                      key={day}
+   421→                      className="h-9 flex items-center justify-center text-xs font-medium text-muted-foreground"
+   422→                    >
+   423→                      {day}
+   424→                    </div>
+   425→                  ))}
+   426→                </div>
+   427→
+   428→                {/* Calendar grid */}
+   429→                <div className="grid grid-cols-7 gap-1">
+   430→                  {calendarDays.map((day, i) => {
+   431→                    const dayEvents = getEventsForDay(day)
+   432→                    const isCurrentMonth = isSameMonth(day, currentMonth)
+   433→                    const isSelected = selectedDate ? isSameDay(day, selectedDate) : false
+   434→                    const today = isToday(day)
+   435→
+   436→                    return (
+   437→                      <button
+   438→                        key={i}
+   439→                        onClick={() => handleDateClick(day)}
+   440→                        className={
+   441→                          'relative min-h-[72px] sm:min-h-[84px] p-1.5 rounded-lg text-left transition-colors border ' +
+   442→                          (isSelected
+   443→                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+   444→                            : 'border-transparent hover:bg-muted/50')
+   445→                        }
+   446→                      >
+   447→                        <span
+   448→                          className={
+   449→                            'text-sm font-medium inline-flex h-7 w-7 items-center justify-center rounded-full ' +
+   450→                            (today
+   451→                              ? 'bg-primary text-primary-foreground'
+   452→                              : isCurrentMonth
+   453→                                ? 'text-foreground'
+   454→                                : 'text-muted-foreground/50')
+   455→                          }
+   456→                        >
+   457→                          {format(day, 'd')}
+   458→                        </span>
+   459→
+   460→                        {/* Event dots */}
+   461→                        <div className="flex flex-col gap-0.5 mt-0.5">
+   462→                          {dayEvents.slice(0, 3).map((event) => (
+   463→                            <div
+   464→                              key={event.id}
+   465→                              className={
+   466→                                'h-1.5 rounded-full ' + getEventDisplayColor(event)
+   467→                              }
+   468→                              title={event.title}
+   469→                            />
+   470→                          ))}
+   471→                          {dayEvents.length > 3 && (
+   472→                            <span className="text-[10px] text-muted-foreground leading-tight">
+   473→                              +{dayEvents.length - 3} more
+   474→                            </span>
+   475→                          )}
+   476→                        </div>
+   477→                      </button>
+   478→                    )
+   479→                  })}
+   480→                </div>
+   481→              </>
+   482→            )}
+   483→          </CardContent>
+   484→        </Card>
+   485→
+   486→        {/* Selected Day Events */}
+   487→        {selectedDate && !loading && (
+   488→          <Card>
+   489→            <CardHeader className="pb-3">
+   490→              <div className="flex items-center justify-between">
+   491→                <CardTitle className="text-base font-semibold">
+   492→                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+   493→                </CardTitle>
+   494→                <Badge variant="secondary">
+   495→                  {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}
+   496→                </Badge>
+   497→              </div>
+   498→            </CardHeader>
+   499→            <CardContent>
+   500→              {selectedDayEvents.length === 0 ? (
+   501→                <div className="text-center py-8">
+   502→                  <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+   503→                  <p className="text-sm text-muted-foreground">No events on this day</p>
+   504→                  <Button
+   505→                    variant="outline"
+   506→                    size="sm"
+   507→                    className="mt-3"
+   508→                    onClick={() => openNewEventDialog(selectedDate)}
+   509→                  >
+   510→                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+   511→                    Add Event
+   512→                  </Button>
+   513→                </div>
+   514→              ) : (
+   515→                <div className="space-y-3">
+   516→                  {selectedDayEvents.map((event) => {
+   517→                    const Icon = TYPE_ICONS[event.type]
+   518→                    const overdue = isOverdue(event)
+   519→                    return (
+   520→                      <button
+   521→                        key={event.id}
+   522→                        onClick={() => handleEventClick(event)}
+   523→                        className={
+   524→                          'w-full text-left p-3 rounded-lg border transition-colors hover:bg-muted/50 ' +
+   525→                          getEventBorderClass(event) + '/30'
+   526→                        }
+   527→                      >
+   528→                        <div className="flex items-start gap-3">
+   529→                          <div
+   530→                            className={
+   531→                              'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ' +
+   532→                              (overdue ? 'bg-red-100 dark:bg-red-900/20' : 'bg-muted')
+   533→                            }
+   534→                          >
+   535→                            <Icon
+   536→                              className={
+   537→                                'h-4 w-4 ' +
+   538→                                (overdue
+   539→                                  ? 'text-red-600 dark:text-red-400'
+   540→                                  : 'text-muted-foreground')
+   541→                              }
+   542→                            />
+   543→                          </div>
+   544→                          <div className="flex-1 min-w-0">
+   545→                            <div className="flex items-center gap-2 flex-wrap">
+   546→                              <span className="font-medium text-sm truncate">
+   547→                                {event.title}
+   548→                              </span>
+   549→                              <Badge
+   550→                                variant="outline"
+   551→                                className={
+   552→                                  'text-[10px] px-1.5 py-0 ' +
+   553→                                  (event.type === 'milestone'
+   554→                                    ? 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+   555→                                    : event.type === 'meeting'
+   556→                                      ? 'border-violet-500/50 text-violet-600 dark:text-violet-400'
+   557→                                      : overdue
+   558→                                        ? 'border-red-500/50 text-red-600 dark:text-red-400'
+   559→                                        : 'border-amber-500/50 text-amber-600 dark:text-amber-400')
+   560→                                }
+   561→                              >
+   562→                                {event.type === 'milestone'
+   563→                                  ? 'Milestone'
+   564→                                  : event.type === 'meeting'
+   565→                                    ? 'Meeting'
+   566→                                    : overdue
+   567→                                      ? 'Overdue'
+   568→                                      : 'Deadline'}
+   569→                              </Badge>
+   570→                            </div>
+   571→                            {event.description && (
+   572→                              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+   573→                                {event.description}
+   574→                              </p>
+   575→                            )}
+   576→                            {event.assignee && (
+   577→                              <p className="text-xs text-muted-foreground mt-1">
+   578→                                Assigned to {event.assignee.name}
+   579→                              </p>
+   580→                            )}
+   581→                            {event.milestone && (
+   582→                              <p className="text-xs text-muted-foreground mt-1">
+   583→                                Milestone: {event.milestone.title}
+   584→                              </p>
+   585→                            )}
+   586→                          </div>
+   587→                          <ExternalLink className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-1" />
+   588→                        </div>
+   589→                      </button>
+   590→                    )
+   591→                  })}
+   592→                </div>
+   593→              )}
+   594→            </CardContent>
+   595→          </Card>
+   596→        )}
+   597→
+   598→        {/* Legend */}
+   599→        {!loading && !error && (
+   600→          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+   601→            <span className="font-medium">Legend:</span>
+   602→            <div className="flex items-center gap-1.5">
+   603→              <span className="h-3 w-3 rounded-full bg-emerald-500" />
+   604→              <span>Milestones</span>
+   605→            </div>
+   606→            <div className="flex items-center gap-1.5">
+   607→              <span className="h-3 w-3 rounded-full bg-amber-500" />
+   608→              <span>Task Deadlines</span>
+   609→            </div>
+   610→            <div className="flex items-center gap-1.5">
+   611→              <span className="h-3 w-3 rounded-full bg-red-500" />
+   612→              <span>Overdue</span>
+   613→            </div>
+   614→            <div className="flex items-center gap-1.5">
+   615→              <span className="h-3 w-3 rounded-full bg-violet-500" />
+   616→              <span>Meetings</span>
+   617→            </div>
+   618→          </div>
+   619→        )}
+   620→      </div>
+   621→
+   622→      {/* New Event Dialog */}
+   623→      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   624→        <DialogContent className="sm:max-w-md">
+   625→          <DialogHeader>
+   626→            <DialogTitle>Create New Event</DialogTitle>
+   627→            <DialogDescription>
+   628→              Add a meeting or milestone to your project calendar.
+   629→            </DialogDescription>
+   630→          </DialogHeader>
+   631→
+   632→          <div className="space-y-4 py-2">
+   633→            {/* Event Type */}
+   634→            <div className="space-y-2">
+   635→              <Label htmlFor="event-type">Event Type</Label>
+   636→              <Select
+   637→                value={eventType}
+   638→                onValueChange={(val: 'meeting' | 'milestone') => setEventType(val)}
+   639→              >
+   640→                <SelectTrigger className="w-full">
+   641→                  <SelectValue placeholder="Select type" />
+   642→                </SelectTrigger>
+   643→                <SelectContent>
+   644→                  <SelectItem value="meeting">
+   645→                    <div className="flex items-center gap-2">
+   646→                      <Users className="h-3.5 w-3.5 text-violet-500" />
+   647→                      Meeting
+   648→                    </div>
+   649→                  </SelectItem>
+   650→                  <SelectItem value="milestone">
+   651→                    <div className="flex items-center gap-2">
+   652→                      <Target className="h-3.5 w-3.5 text-emerald-500" />
+   653→                      Milestone
+   654→                    </div>
+   655→                  </SelectItem>
+   656→                </SelectContent>
+   657→              </Select>
+   658→            </div>
+   659→
+   660→            {/* Project */}
+   661→            <div className="space-y-2">
+   662→              <Label htmlFor="event-project">Project</Label>
+   663→              <Select value={eventProjectId} onValueChange={setEventProjectId}>
+   664→                <SelectTrigger className="w-full">
+   665→                  <SelectValue placeholder="Select project" />
+   666→                </SelectTrigger>
+   667→                <SelectContent>
+   668→                  {userProjects.map((p) => (
+   669→                    <SelectItem key={p.id} value={p.id}>
+   670→                      {p.name}
+   671→                    </SelectItem>
+   672→                  ))}
+   673→                </SelectContent>
+   674→              </Select>
+   675→            </div>
+   676→
+   677→            {/* Title */}
+   678→            <div className="space-y-2">
+   679→              <Label htmlFor="event-title">Title *</Label>
+   680→              <Input
+   681→                id="event-title"
+   682→                placeholder="Enter event title"
+   683→                value={eventTitle}
+   684→                onChange={(e) => setEventTitle(e.target.value)}
+   685→                onKeyDown={(e) => {
+   686→                  if (e.key === 'Enter') handleSubmitEvent()
+   687→                }}
+   688→              />
+   689→            </div>
+   690→
+   691→            {/* Date */}
+   692→            <div className="space-y-2">
+   693→              <Label htmlFor="event-date">Date *</Label>
+   694→              <Input
+   695→                id="event-date"
+   696→                type="date"
+   697→                value={dialogDate}
+   698→                onChange={(e) => setDialogDate(e.target.value)}
+   699→              />
+   700→            </div>
+   701→
+   702→            {/* Duration (meetings only) */}
+   703→            {eventType === 'meeting' && (
+   704→              <div className="space-y-2">
+   705→                <Label htmlFor="event-duration">Duration</Label>
+   706→                <Select value={eventDuration} onValueChange={setEventDuration}>
+   707→                  <SelectTrigger className="w-full">
+   708→                    <SelectValue placeholder="Select duration" />
+   709→                  </SelectTrigger>
+   710→                  <SelectContent>
+   711→                    {DURATION_OPTIONS.map((opt) => (
+   712→                      <SelectItem key={opt.value} value={opt.value}>
+   713→                        {opt.label}
+   714→                      </SelectItem>
+   715→                    ))}
+   716→                  </SelectContent>
+   717→                </Select>
+   718→              </div>
+   719→            )}
+   720→
+   721→            {/* Description */}
+   722→            <div className="space-y-2">
+   723→              <Label htmlFor="event-description">Description</Label>
+   724→              <Textarea
+   725→                id="event-description"
+   726→                placeholder="Optional description..."
+   727→                value={eventDescription}
+   728→                onChange={(e) => setEventDescription(e.target.value)}
+   729→                rows={3}
+   730→                className="resize-none"
+   731→              />
+   732→            </div>
+   733→          </div>
+   734→
+   735→          <DialogFooter>
+   736→            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+   737→              Cancel
+   738→            </Button>
+   739→            <Button onClick={handleSubmitEvent} disabled={submitting || !eventTitle.trim()}>
+   740→              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   741→              Create {eventType === 'meeting' ? 'Meeting' : 'Milestone'}
+   742→            </Button>
+   743→          </DialogFooter>
+   744→        </DialogContent>
+   745→      </Dialog>
+   746→    </div>
+   747→  )
+   748→}

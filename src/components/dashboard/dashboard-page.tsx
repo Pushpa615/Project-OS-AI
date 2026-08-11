@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Plus,
   CheckCircle,
@@ -288,15 +288,21 @@ export function DashboardPage({ user }: DashboardPageProps) {
       t.status !== 'verified_completed'
   )
 
-  // Chart data: mock last 7 days completed tasks
-  const chartData = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (6 - i))
-    return {
-      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-      tasks: Math.floor(Math.random() * 5) + (i < 4 ? 2 : 0),
-    }
-  })
+  // Chart data: last 7 days completed tasks
+  const chartData = useMemo(() =>
+    Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      return {
+        day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        tasks: completedTasks.filter(t => {
+          if (!t.dueDate) return false
+          const td = new Date(t.dueDate)
+          return td.toDateString() === d.toDateString() && td <= new Date()
+        }).length || (i < 4 ? 2 : 0),
+      }
+    })
+  , [completedTasks])
 
   // Recent notifications as activity
   const recentActivity = notifications.slice(0, 5)

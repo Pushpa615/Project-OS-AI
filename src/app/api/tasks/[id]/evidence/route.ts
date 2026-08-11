@@ -90,7 +90,8 @@ export async function GET(
 ) {
   try {
     const auth = await requireAuth(req)
-    const sessionUserId = auth.error ? undefined : auth.user.id
+    if (auth.error) return auth.error
+    const sessionUserId = auth.user.id
 
     const { id } = await params
 
