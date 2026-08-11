@@ -1,0 +1,492 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTH (NextAuth) ============
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============ USER & PROFILE ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  emailVerified DateTime?
+  role          String    @default("member") // member, admin
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  profile           UserProfile?
+  notificationPrefs NotificationPreference?
+  connectedAccounts ConnectedAccount[] @relation("UserConnectedAccounts")
+  createdProjects   Project[]    @relation("ProjectCreator")
+  projectMemberships ProjectMember[]
+  assignedTasks     Task[]       @relation("TaskAssignee")
+  dailyCheckins     DailyCheckin[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  comments          Comment[]
+  taskComments      TaskComment[]
+  aiRequests        AiRequest[]
+  portfolios        Portfolio[]
+
+  @@index([email])
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  fullName      String?
+  college       String?
+  course        String?
+  academicYear  String?
+  phone         String?
+  bio           String?
+  skills        String   @default("[]")
+  onboarded     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectedAccounts  ConnectedAccount[]
+
+  @@index([userId])
+}
+
+model ConnectedAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  provider      String
+  displayName   String?
+  url           String?
+  accessToken   String?
+  refreshToken  String?
+  expiresAt     DateTime?
+  metadata      String?  @default("{}")
+  connectedAt   DateTime @default(now())
+  lastSyncedAt  DateTime?
+
+  user    User        @relation("UserConnectedAccounts", fields: [userId], references: [id], onDelete: Cascade)
+  profile UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+// ============ NOTIFICATION ============
+
+model NotificationPreference {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  emailNotifs  Boolean  @default(true)
+  smsNotifs    Boolean  @default(false)
+  pushNotifs   Boolean  @default(true)
+  inAppNotifs  Boolean  @default(true)
+  reminderDays String  @default("[7,3,1]")
+  reminderHours String @default("[6,1]")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  metadata  String?  @default("{}")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+// ============ PROJECT ============
+
+model Project {
+  id              String    @id @default(cuid())
+  name            String
+  description     String
+  projectType     String
+  targetUsers     String?
+  goal            String?
+  deadline        DateTime?
+  difficulty      String    @default("medium")
+  techStack       String    @default("[]")
+  features        String    @default("[]")
+  requirements    String?
+  status          String    @default("planning")
+  progress        Float     @default(0)
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+
+  creator       User            @relation("ProjectCreator", fields: [createdBy], references: [id])
+  members       ProjectMember[]
+  milestones    Milestone[]
+  tasks         Task[]
+  comments      Comment[]
+  files         ProjectFile[]
+  reports       ProjectReport[]
+  activityLogs  ActivityLog[]
+  meetings      Meeting[]
+  aiRequests    AiRequest[]
+
+  @@index([createdBy])
+  @@index([status])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("member")
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+// ============ MILESTONE ============
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  order       Int       @default(0)
+  status      String    @default("not_started")
+  startDate   DateTime?
+  dueDate     DateTime?
+  progress    Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([projectId])
+}
+
+// ============ TASK ============
+
+model Task {
+  id                String    @id @default(cuid())
+  projectId         String
+  milestoneId       String?
+  title             String
+  description       String?
+  assignedTo        String?
+  priority          String    @default("medium")
+  status            String    @default("not_started")
+  startDate         DateTime?
+  dueDate           DateTime?
+  estimatedHours    Float?
+  actualHours       Float?
+  completionPercent Float     @default(0)
+  evidenceReq       String?
+  order             Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  verifiedAt        DateTime?
+  verifiedBy        String?
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone      Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  assignee       User?            @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  dependencies   TaskDependency[] @relation("TaskDependencies")
+  dependentTasks TaskDependency[] @relation("DependsOnTasks")
+  evidence       TaskEvidence[]
+  taskComments   Comment[]
+  comments      TaskComment[]
+  aiRequests     AiRequest[]
+
+  @@index([projectId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([milestoneId])
+  @@index([dueDate])
+}
+
+model TaskDependency {
+  id          String @id @default(cuid())
+  taskId      String
+  dependsOnId String
+
+  task      Task @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("DependsOnTasks", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@index([taskId])
+  @@index([dependsOnId])
+}
+
+// ============ EVIDENCE ============
+
+model TaskEvidence {
+  id          String    @id @default(cuid())
+  taskId      String
+  type        String
+  title       String
+  description String?
+  url         String?
+  fileName    String?
+  filePath    String?
+  metadata    String?  @default("{}")
+  confidence  Float?
+  aiAnalysis  String?
+  createdAt   DateTime  @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+// ============ CHECK-IN ============
+
+model DailyCheckin {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  date        String
+  completed   String?
+  workingOn   String?
+  blocked     Boolean  @default(false)
+  blockReason String?
+  remains     String?
+  needHelp    String?
+  aiFeedback  String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+// ============ COMMENTS ============
+
+model Comment {
+  id        String   @id @default(cuid())
+  projectId String?
+  taskId    String?
+  userId    String
+  content   String
+  mentions  String?  @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+// ============ FILES ============
+
+model ProjectFile {
+  id         String   @id @default(cuid())
+  projectId  String
+  fileName   String
+  filePath   String
+  fileSize   Int?
+  mimeType   String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// ============ MEETINGS ============
+
+model Meeting {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  date        DateTime
+  duration    Int?
+  notes       String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([date])
+}
+
+// ============ AI ============
+
+model AiRequest {
+  id         String   @id @default(cuid())
+  projectId  String?
+  taskId     String?
+  userId     String
+  type       String
+  prompt     String
+  response   String?
+  model      String?
+  tokensUsed Int?
+  duration   Int?
+  status     String   @default("pending")
+  error      String?
+  createdAt  DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AiFeedback {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  category    String
+  strength    String?
+  improvement String?
+  nextSteps   String?
+  generatedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+// ============ REPORTS ============
+
+model ProjectReport {
+  id                 String   @id @default(cuid())
+  projectId          String
+  summary            String?
+  plannedVsActual    String?  @default("{}")
+  timelinePerf       String?  @default("{}")
+  taskCompletion     String?  @default("{}")
+  teamContribution   String?  @default("[]")
+  strengths          String?
+  weaknesses         String?
+  challenges         String?
+  improvements       String?
+  recommendedSkills  String?  @default("[]")
+  futureImprovements String?
+  overallAssessment  String?
+  generatedAt        DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// ============ PORTFOLIO ============
+
+model Portfolio {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  title        String
+  description  String?
+  technologies String   @default("[]")
+  contribution String?
+  screenshots  String?  @default("[]")
+  githubUrl    String?
+  liveUrl      String?
+  aiSummary    String?
+  isPublic     Boolean  @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isPublic])
+}
+
+// ============ ACTIVITY LOG ============
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  projectId   String?
+  userId      String?
+  action      String
+  description String?
+  metadata    String?  @default("{}")
+  createdAt   DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([createdAt])
+}
