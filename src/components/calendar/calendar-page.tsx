@@ -2,11 +2,30 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavStore } from '@/lib/nav-store'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,6 +34,9 @@ import {
   Clock,
   AlertTriangle,
   Users,
+  Plus,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react'
 import {
   format,
@@ -50,6 +72,11 @@ interface CalendarEvent {
   milestone?: { id: string; title: string } | null
 }
 
+interface UserProject {
+  id: string
+  name: string
+}
+
 interface CalendarPageProps {
   userId: string
   projectId?: string
@@ -69,13 +96,54 @@ const TYPE_COLORS: Record<EventType, string> = {
   meeting: 'bg-violet-500',
 }
 
+const DURATION_OPTIONS = [
+  { value: '15', label: '15 minutes' },
+  { value: '30', label: '30 minutes' },
+  { value: '45', label: '45 minutes' },
+  { value: '60', label: '1 hour' },
+  { value: '90', label: '1.5 hours' },
+  { value: '120', label: '2 hours' },
+  { value: '180', label: '3 hours' },
+]
+
 export function CalendarPage({ userId, projectId }: CalendarPageProps) {
   const navigate = useNavStore((s) => s.navigate)
+  const { toast } = useToast()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // New event dialog state
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogDate, setDialogDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
+  const [eventType, setEventType] = useState<'meeting' | 'milestone'>('meeting')
+  const [eventTitle, setEventTitle] = useState('')
+  const [eventDescription, setEventDescription] = useState('')
+  const [eventDuration, setEventDuration] = useState('60')
+  const [eventProjectId, setEventProjectId] = useState('')
+  const [userProjects, setUserProjects] = useState<UserProject[]>([])
+  const [submitting, setSubmitting] = useState(false)
+
+  // Fetch user projects for the dialog
+  const fetchUserProjects = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects?userId=${userId}`)
+      const json = await res.json()
+      if (json.data) {
+        setUserProjects(json.data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
+        // Default to the current project if available
+        if (projectId && json.data.some((p: { id: string }) => p.id === projectId)) {
+          setEventProjectId(projectId)
+        } else if (json.data.length > 0) {
+          setEventProjectId(json.data[0].id)
+        }
+      }
+    } catch {
+      // Silently fail for projects fetch
+    }
+  }, [userId, projectId])
 
   const fetchEvents = useCallback(async () => {
     if (!projectId) return
@@ -99,6 +167,83 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
   useEffect(() => {
     fetchEvents()
   }, [fetchEvents])
+
+  useEffect(() => {
+    fetchUserProjects()
+  }, [fetchUserProjects])
+
+  const openNewEventDialog = useCallback(
+    (date?: Date) => {
+      setDialogDate(date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+      setEventType('meeting')
+      setEventTitle('')
+      setEventDescription('')
+      setEventDuration('60')
+      if (projectId) {
+        setEventProjectId(projectId)
+      }
+      setDialogOpen(true)
+    },
+    [projectId]
+  )
+
+  const handleSubmitEvent = useCallback(async () => {
+    if (!eventTitle.trim()) {
+      toast({ title: 'Title is required', variant: 'destructive' })
+      return
+    }
+    if (!eventProjectId) {
+      toast({ title: 'Please select a project', variant: 'destructive' })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const payload: Record<string, unknown> = {
+        type: eventType,
+        projectId: eventProjectId,
+        title: eventTitle.trim(),
+        date: dialogDate,
+        description: eventDescription.trim(),
+        userId,
+      }
+
+      if (eventType === 'meeting') {
+        payload.duration = parseInt(eventDuration, 10)
+        payload.createdBy = userId
+      }
+
+      const res = await fetch('/api/calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const json = await res.json()
+
+      if (json.error) {
+        toast({ title: json.error, variant: 'destructive' })
+        return
+      }
+
+      toast({
+        title: `${eventType === 'meeting' ? 'Meeting' : 'Milestone'} created`,
+        description: eventTitle.trim(),
+      })
+
+      setDialogOpen(false)
+
+      // Refresh events
+      await fetchEvents()
+
+      // If the event was created for the currently viewed project, also refresh user projects
+      // to ensure the list stays current
+    } catch {
+      toast({ title: 'Failed to create event', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }, [eventType, eventProjectId, eventTitle, dialogDate, eventDescription, eventDuration, userId, toast, fetchEvents])
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth)
@@ -149,9 +294,18 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
         navigate('task-detail', { id: event.id })
       } else if (event.type === 'milestone' && projectId) {
         navigate('project-detail', { id: projectId })
+      } else if (event.type === 'meeting' && projectId) {
+        navigate('project-detail', { id: projectId })
       }
     },
     [navigate, projectId]
+  )
+
+  const handleDateClick = useCallback(
+    (day: Date) => {
+      setSelectedDate(day)
+    },
+    []
   )
 
   const prevMonth = () => setCurrentMonth((m) => subMonths(m, 1))
@@ -207,9 +361,15 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
               <p className="text-sm text-muted-foreground">Project timeline and events</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={goToday}>
-            Today
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={goToday}>
+              Today
+            </Button>
+            <Button size="sm" onClick={() => openNewEventDialog(selectedDate || undefined)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Event
+            </Button>
+          </div>
         </div>
 
         {/* Month Navigation */}
@@ -276,7 +436,7 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
                     return (
                       <button
                         key={i}
-                        onClick={() => setSelectedDate(day)}
+                        onClick={() => handleDateClick(day)}
                         className={
                           'relative min-h-[72px] sm:min-h-[84px] p-1.5 rounded-lg text-left transition-colors border ' +
                           (isSelected
@@ -341,6 +501,15 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
                 <div className="text-center py-8">
                   <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">No events on this day</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => openNewEventDialog(selectedDate)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Event
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -415,6 +584,7 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
                               </p>
                             )}
                           </div>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-1" />
                         </div>
                       </button>
                     )
@@ -448,6 +618,131 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
           </div>
         )}
       </div>
+
+      {/* New Event Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Event</DialogTitle>
+            <DialogDescription>
+              Add a meeting or milestone to your project calendar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Event Type */}
+            <div className="space-y-2">
+              <Label htmlFor="event-type">Event Type</Label>
+              <Select
+                value={eventType}
+                onValueChange={(val: 'meeting' | 'milestone') => setEventType(val)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="meeting">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-3.5 w-3.5 text-violet-500" />
+                      Meeting
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="milestone">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-3.5 w-3.5 text-emerald-500" />
+                      Milestone
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Project */}
+            <div className="space-y-2">
+              <Label htmlFor="event-project">Project</Label>
+              <Select value={eventProjectId} onValueChange={setEventProjectId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Title */}
+            <div className="space-y-2">
+              <Label htmlFor="event-title">Title *</Label>
+              <Input
+                id="event-title"
+                placeholder="Enter event title"
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubmitEvent()
+                }}
+              />
+            </div>
+
+            {/* Date */}
+            <div className="space-y-2">
+              <Label htmlFor="event-date">Date *</Label>
+              <Input
+                id="event-date"
+                type="date"
+                value={dialogDate}
+                onChange={(e) => setDialogDate(e.target.value)}
+              />
+            </div>
+
+            {/* Duration (meetings only) */}
+            {eventType === 'meeting' && (
+              <div className="space-y-2">
+                <Label htmlFor="event-duration">Duration</Label>
+                <Select value={eventDuration} onValueChange={setEventDuration}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DURATION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="event-description">Description</Label>
+              <Textarea
+                id="event-description"
+                placeholder="Optional description..."
+                value={eventDescription}
+                onChange={(e) => setEventDescription(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitEvent} disabled={submitting || !eventTitle.trim()}>
+              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create {eventType === 'meeting' ? 'Meeting' : 'Milestone'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ========== GET: Get calendar events ==========
@@ -126,6 +127,138 @@ export async function GET(req: NextRequest) {
     console.error('Get calendar error:', error)
     return NextResponse.json(
       { error: 'Failed to get calendar events' },
+      { status: 500 }
+    )
+  }
+}
+
+// ========== POST: Create meeting or milestone ==========
+const createMeetingSchema = z.object({
+  type: z.literal('meeting'),
+  projectId: z.string().min(1, 'Project is required'),
+  title: z.string().min(1, 'Title is required').max(200),
+  date: z.string().min(1, 'Date is required'),
+  duration: z.number().int().positive().default(60),
+  description: z.string().optional().default(''),
+  userId: z.string().min(1, 'User ID is required'),
+  createdBy: z.string().min(1, 'Creator ID is required'),
+})
+
+const createMilestoneSchema = z.object({
+  type: z.literal('milestone'),
+  projectId: z.string().min(1, 'Project is required'),
+  title: z.string().min(1, 'Title is required').max(200),
+  date: z.string().min(1, 'Date is required'),
+  description: z.string().optional().default(''),
+  userId: z.string().min(1, 'User ID is required'),
+})
+
+const createEventSchema = z.discriminatedUnion('type', [
+  createMeetingSchema,
+  createMilestoneSchema,
+])
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const parsed = createEventSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const data = parsed.data
+    const eventDate = new Date(data.date)
+
+    // Verify project exists
+    const project = await db.project.findUnique({
+      where: { id: data.projectId },
+    })
+    if (!project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
+    }
+
+    if (data.type === 'meeting') {
+      const meetingCount = await db.meeting.count({
+        where: { projectId: data.projectId },
+      })
+
+      const meeting = await db.meeting.create({
+        data: {
+          projectId: data.projectId,
+          title: data.title,
+          description: data.description || null,
+          date: eventDate,
+          duration: data.duration,
+          createdBy: data.createdBy,
+        },
+      })
+
+      // Create activity log
+      await db.activityLog.create({
+        data: {
+          projectId: data.projectId,
+          userId: data.userId,
+          action: 'meeting_created',
+          description: `Created meeting "${data.title}" on ${eventDate.toLocaleDateString()}`,
+          metadata: JSON.stringify({
+            meetingId: meeting.id,
+            duration: data.duration,
+          }),
+        },
+      })
+
+      return NextResponse.json(
+        { data: meeting, message: 'Meeting created successfully' },
+        { status: 201 }
+      )
+    } else {
+      // Milestone
+      const milestoneCount = await db.milestone.count({
+        where: { projectId: data.projectId },
+      })
+
+      const milestone = await db.milestone.create({
+        data: {
+          projectId: data.projectId,
+          title: data.title,
+          description: data.description || null,
+          startDate: eventDate,
+          dueDate: eventDate,
+          status: 'not_started',
+          progress: 0,
+          order: milestoneCount,
+        },
+      })
+
+      // Create activity log
+      await db.activityLog.create({
+        data: {
+          projectId: data.projectId,
+          userId: data.userId,
+          action: 'milestone_created',
+          description: `Created milestone "${data.title}" due ${eventDate.toLocaleDateString()}`,
+          metadata: JSON.stringify({
+            milestoneId: milestone.id,
+          }),
+        },
+      })
+
+      return NextResponse.json(
+        { data: milestone, message: 'Milestone created successfully' },
+        { status: 201 }
+      )
+    }
+  } catch (error) {
+    console.error('Create calendar event error:', error)
+    return NextResponse.json(
+      { error: 'Failed to create event' },
       { status: 500 }
     )
   }

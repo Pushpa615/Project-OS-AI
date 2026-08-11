@@ -64,6 +64,7 @@ const createProjectSchema = z.object({
   techStack: z.array(z.string()).optional().default([]),
   features: z.array(z.string()).optional().default([]),
   requirements: z.string().optional().default(''),
+  teamMembers: z.array(z.string()).optional().default([]),
 })
 
 export async function POST(req: NextRequest) {
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
       techStack,
       features,
       requirements,
+      teamMembers,
     } = parsed.data
 
     // Verify user exists
@@ -144,8 +146,58 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Add team members by email lookup
+    if (teamMembers && teamMembers.length > 0) {
+      const existingUsers = await db.user.findMany({
+        where: { email: { in: teamMembers } },
+        select: { id: true, email: true },
+      })
+      const emailToId = new Map(existingUsers.map((u) => [u.email, u.id]))
+      const membersToCreate = []
+      const notFoundEmails = []
+
+      for (const email of teamMembers) {
+        const uid = emailToId.get(email)
+        if (uid && uid !== userId) {
+          membersToCreate.push({ projectId: project.id, userId: uid, role: 'member' })
+        } else if (uid !== userId) {
+          notFoundEmails.push(email)
+        }
+      }
+
+      if (membersToCreate.length > 0) {
+        await db.projectMember.createMany({ data: membersToCreate })
+      }
+
+      // Create notifications for added members
+      for (const m of membersToCreate) {
+        await db.notification.create({
+          data: {
+            userId: m.userId,
+            type: 'project_invite',
+            title: 'Added to Project',
+            message: `You have been added as a member to project "${name}"`,
+            link: `project-detail?id=${project.id}`,
+            metadata: JSON.stringify({ projectId: project.id }),
+          },
+        })
+      }
+    }
+
+    // Re-fetch with all members included
+    const finalProject = await db.project.findUnique({
+      where: { id: project.id },
+      include: {
+        members: {
+          include: {
+            user: { select: { id: true, name: true, email: true, avatar: true } },
+          },
+        },
+      },
+    })
+
     return NextResponse.json(
-      { data: project, message: 'Project created successfully' },
+      { data: finalProject, message: 'Project created successfully' },
       { status: 201 }
     )
   } catch (error) {

@@ -138,3 +138,66 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// ========== PUT: Update profile (settings page) ==========
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const parsed = onboardingSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const { userId, fullName, college, course, academicYear, phone, bio, skills } = parsed.data
+
+    const user = await db.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const profile = await db.userProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        fullName,
+        college,
+        course,
+        academicYear,
+        phone,
+        bio,
+        skills: JSON.stringify(skills),
+        onboarded: true,
+      },
+      update: {
+        fullName,
+        college,
+        course,
+        academicYear,
+        phone,
+        bio,
+        skills: JSON.stringify(skills),
+      },
+    })
+
+    // Also update user name
+    await db.user.update({
+      where: { id: userId },
+      data: { name: fullName },
+    })
+
+    return NextResponse.json({
+      data: profile,
+      message: 'Profile updated successfully',
+    })
+  } catch (error) {
+    console.error('Update profile error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update profile' },
+      { status: 500 }
+    )
+  }
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Briefcase,
   Plus,
@@ -13,6 +13,8 @@ import {
   Sparkles,
   Github,
   Link as LinkIcon,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Select,
   SelectContent,
@@ -148,6 +160,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     projectId: '',
     title: '',
@@ -162,7 +175,23 @@ export function PortfolioPage({ userId }: { userId: string }) {
   // Detail view state
   const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioItem | null>(null)
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   // Fetch portfolios and projects
+  const fetchPortfolios = useCallback(async () => {
+    try {
+      const portRes = await fetch(`/api/portfolio?userId=${userId}`)
+      const portJson = await portRes.json()
+      if (portJson.data) {
+        setPortfolios(Array.isArray(portJson.data) ? portJson.data : [portJson.data])
+      }
+    } catch {
+      // silently fail on refresh
+    }
+  }, [userId])
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
@@ -188,26 +217,33 @@ export function PortfolioPage({ userId }: { userId: string }) {
     fetchData()
   }, [userId])
 
-  // Create portfolio
-  async function handleCreate() {
+  // Create or Update portfolio
+  async function handleSubmit() {
     if (!form.title.trim()) return
     setSaving(true)
     setError(null)
     try {
+      const isEditing = !!editingId
+      const method = isEditing ? 'PUT' : 'POST'
+      const body: Record<string, unknown> = {
+        userId,
+        projectId: form.projectId || null,
+        title: form.title,
+        description: form.description || null,
+        technologies: JSON.stringify(form.technologies),
+        contribution: form.contribution || null,
+        githubUrl: form.githubUrl || null,
+        liveUrl: form.liveUrl || null,
+        isPublic: form.isPublic,
+      }
+      if (isEditing) {
+        body.id = editingId
+      }
+
       const res = await fetch('/api/portfolio', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          projectId: form.projectId || null,
-          title: form.title,
-          description: form.description || null,
-          technologies: JSON.stringify(form.technologies),
-          contribution: form.contribution || null,
-          githubUrl: form.githubUrl || null,
-          liveUrl: form.liveUrl || null,
-          isPublic: form.isPublic,
-        }),
+        body: JSON.stringify(body),
       })
       const json = await res.json()
       if (json.error) {
@@ -215,17 +251,70 @@ export function PortfolioPage({ userId }: { userId: string }) {
       } else {
         setDialogOpen(false)
         resetForm()
+        setEditingId(null)
         // Refresh portfolios
-        const portRes = await fetch(`/api/portfolio?userId=${userId}`)
-        const portJson = await portRes.json()
-        if (portJson.data) {
-          setPortfolios(Array.isArray(portJson.data) ? portJson.data : [portJson.data])
+        await fetchPortfolios()
+        // If we were editing and viewing the same item, update the selected portfolio
+        if (isEditing && selectedPortfolio) {
+          const updated = portfolios.find((p) => p.id === editingId)
+          if (updated) {
+            setSelectedPortfolio({
+              ...updated,
+              title: form.title,
+              description: form.description || null,
+              technologies: JSON.stringify(form.technologies),
+              contribution: form.contribution || null,
+              githubUrl: form.githubUrl || null,
+              liveUrl: form.liveUrl || null,
+              isPublic: form.isPublic,
+            })
+          }
         }
       }
     } catch {
-      setError('Failed to create portfolio')
+      setError(isEditing ? 'Failed to update portfolio' : 'Failed to create portfolio')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Open edit dialog pre-populated with item data
+  function handleEdit(item: PortfolioItem) {
+    setEditingId(item.id)
+    setForm({
+      projectId: item.projectId || '',
+      title: item.title,
+      description: item.description || '',
+      technologies: parseTechnologies(item.technologies),
+      contribution: item.contribution || '',
+      githubUrl: item.githubUrl || '',
+      liveUrl: item.liveUrl || '',
+      isPublic: item.isPublic,
+    })
+    setDialogOpen(true)
+  }
+
+  // Delete portfolio
+  async function handleDelete() {
+    if (!selectedPortfolio) return
+    setDeleting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/portfolio?id=${selectedPortfolio.id}&userId=${userId}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json()
+      if (json.error) {
+        setError(json.error)
+      } else {
+        setDeleteDialogOpen(false)
+        setSelectedPortfolio(null)
+        await fetchPortfolios()
+      }
+    } catch {
+      setError('Failed to delete portfolio')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -240,6 +329,14 @@ export function PortfolioPage({ userId }: { userId: string }) {
       liveUrl: '',
       isPublic: false,
     })
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    setDialogOpen(open)
+    if (!open) {
+      resetForm()
+      setEditingId(null)
+    }
   }
 
   // ==================== DETAIL VIEW ====================
@@ -276,7 +373,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {selectedPortfolio.githubUrl && (
               <a href={selectedPortfolio.githubUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline" size="sm">
@@ -291,6 +388,12 @@ export function PortfolioPage({ userId }: { userId: string }) {
                 </Button>
               </a>
             )}
+            <Button variant="outline" size="sm" onClick={() => handleEdit(selectedPortfolio)}>
+              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+            </Button>
           </div>
         </div>
 
@@ -344,51 +447,37 @@ export function PortfolioPage({ userId }: { userId: string }) {
             </CardContent>
           </Card>
         )}
-      </div>
-    )
-  }
 
-  // ==================== LOADING STATE ====================
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Portfolio Item</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this portfolio item? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-52 rounded-xl" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // ==================== RENDER ====================
-
-  return (
-    <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Briefcase className="h-6 w-6 text-primary" />
-            Portfolio
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Showcase your projects and achievements
-          </p>
-        </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" /> Create Portfolio
-            </Button>
-          </DialogTrigger>
+        {/* Edit Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create Portfolio Entry</DialogTitle>
+              <DialogTitle>Edit Portfolio Item</DialogTitle>
               <DialogDescription>
-                Add a project to your portfolio showcase
+                Update your portfolio entry details
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -479,12 +568,170 @@ export function PortfolioPage({ userId }: { userId: string }) {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreate} disabled={saving || !form.title.trim()}>
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                Create
+              <Button onClick={handleSubmit} disabled={saving || !form.title.trim()}>
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Pencil className="h-4 w-4 mr-2" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Error display in detail view */}
+        {error && (
+          <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ==================== LOADING STATE ====================
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-52 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ==================== RENDER ====================
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Briefcase className="h-6 w-6 text-primary" />
+            Portfolio
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Showcase your projects and achievements
+          </p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" /> Create Portfolio
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingId ? 'Edit Portfolio Item' : 'Create Portfolio Entry'}</DialogTitle>
+              <DialogDescription>
+                {editingId ? 'Update your portfolio entry details' : 'Add a project to your portfolio showcase'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Project</Label>
+                <Select
+                  value={form.projectId}
+                  onValueChange={(v) => setForm({ ...form, projectId: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="port-title">Title *</Label>
+                <Input
+                  id="port-title"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g. E-Commerce Platform"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="port-desc">Description</Label>
+                <Textarea
+                  id="port-desc"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Brief description of the project..."
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Technologies</Label>
+                <TagInput
+                  value={form.technologies}
+                  onChange={(v) => setForm({ ...form, technologies: v })}
+                  placeholder="e.g. React, Node.js, PostgreSQL"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="port-contribution">Contribution</Label>
+                <Textarea
+                  id="port-contribution"
+                  value={form.contribution}
+                  onChange={(e) => setForm({ ...form, contribution: e.target.value })}
+                  placeholder="Describe your role and contributions..."
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="port-github">GitHub URL</Label>
+                  <Input
+                    id="port-github"
+                    value={form.githubUrl}
+                    onChange={(e) => setForm({ ...form, githubUrl: e.target.value })}
+                    placeholder="https://github.com/..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="port-live">Live URL</Label>
+                  <Input
+                    id="port-live"
+                    value={form.liveUrl}
+                    onChange={(e) => setForm({ ...form, liveUrl: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Public Portfolio</Label>
+                  <p className="text-xs text-muted-foreground">Make this entry visible to others</p>
+                </div>
+                <Switch
+                  checked={form.isPublic}
+                  onCheckedChange={(c) => setForm({ ...form, isPublic: c })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={saving || !form.title.trim()}>
+                {saving ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : editingId ? (
+                  <Pencil className="h-4 w-4 mr-2" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                {editingId ? 'Save Changes' : 'Create'}
               </Button>
             </DialogFooter>
           </DialogContent>

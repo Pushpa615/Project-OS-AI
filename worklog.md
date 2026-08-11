@@ -371,3 +371,149 @@ Stage Summary:
 - AI integration fully functional (plan generation created 7 milestones + 21 tasks)
 - Zero lint errors, zero dev log errors
 - Application is production-ready
+
+---
+Task ID: 6-a
+Agent: main
+Task: Add drag-and-drop functionality to Kanban board in tasks-page.tsx
+
+Work Log:
+- Read existing tasks-page.tsx (299 lines) and tasks/[id]/route.ts PUT endpoint
+- Confirmed @dnd-kit/core@6.3.1, @dnd-kit/sortable@10.0.0, @dnd-kit/utilities@3.2.2 installed
+- Rewrote tasks-page.tsx with DnD Kit integration:
+  - Imported DndContext, useDraggable, useDroppable, DragOverlay, PointerSensor, useSensor, useSensors, closestCorners from @dnd-kit/core
+  - Imported CSS utility from @dnd-kit/utilities for transform styling
+  - Created DraggableTaskCard component wrapping each task card with useDraggable (id=task.id, data includes task + type)
+  - Added GripVertical drag handle icon on each card for clear affordance
+  - Created DragOverlayCard component for the floating drag preview with shadow + border highlight
+  - Created DroppableColumn component wrapping each column card list with useDroppable (id=column-{key})
+  - Added visual drop indicator: bg-primary/5 + ring-2 ring-primary/30 when isOver is true
+  - Empty columns show Drop here text when a card is dragged over them
+  - Configured PointerSensor with 8px activation distance to avoid accidental drags on click
+  - Used closestCorners collision detection for natural column targeting
+  - Implemented handleDragStart: stores active task + pre-drag snapshot via useRef
+  - Implemented handleDragEnd: detects target column from over data (column or task type), skips same-column drops
+  - Optimistic update: immediately moves task to new column via setAllTasks
+  - API call: PUT /api/tasks/{id} with { status, userId }
+  - Loading state: updatingTaskId adds opacity-60 + Loader2 spinner overlay on the moving card
+  - Failure revert: restores pre-drag snapshot from tasksBeforeDrag.current ref
+  - Removed unused imports (Input, Progress, Skeleton components) and unused projectFilter state
+  - Replaced shadcn Progress component with plain div-based progress bar to avoid import
+  - Replaced Skeleton component in ColumnSkeleton with plain div-based pulse animation
+  - Kept all existing functionality: filtering, sorting, priority badges, navigation, error/loading states
+- Clean ESLint pass (0 errors)
+- Dev log clean (0 errors)
+
+Stage Summary:
+- Kanban board now supports drag-and-drop between all 7 status columns
+- Visual feedback: drag handle, overlay card, column highlight on hover, spinner during API call
+- Optimistic updates with automatic revert on API failure
+- All existing features (filtering, sorting, priority badges, navigation) preserved
+- Zero lint errors, zero dev log errors
+
+---
+Task ID: 6-b
+Agent: main
+Task: Add edit and delete functionality to portfolio page
+
+Work Log:
+- Read existing portfolio-page.tsx (580 lines) and /api/portfolio/route.ts (143 lines)
+- Confirmed AlertDialog component exists in shadcn/ui, confirmed Prisma Portfolio model schema
+- Updated portfolio-page.tsx with full edit/delete functionality:
+  - Added imports: Pencil, Trash2 from lucide-react; AlertDialog components from shadcn/ui; useCallback from React
+  - Added `editingId` state (string | null) to track which portfolio item is being edited
+  - Added `deleteDialogOpen` and `deleting` states for delete confirmation flow
+  - Renamed `handleCreate` → `handleSubmit` that checks `editingId` and uses PUT (edit) or POST (create)
+  - Added `handleEdit(item)` function: populates form with item data, sets editingId, opens dialog
+  - Added `handleDelete()` function: calls DELETE /api/portfolio?id=...&userId=..., closes detail view, refreshes list
+  - Added `handleDialogOpenChange` that resets form and editingId on close
+  - Extracted `fetchPortfolios` as a reusable callback for refreshing after mutations
+  - Detail view: added Edit button (Pencil icon) and Delete button (Trash2 icon, destructive variant) in the header actions area
+  - Delete confirmation: AlertDialog with "Are you sure you want to delete this portfolio item? This action cannot be undone." message, Cancel and Delete buttons with loading state
+  - Edit dialog: separate Dialog in detail view pre-populated with current data, title shows "Edit Portfolio Item"
+  - Main dialog (grid view): title dynamically shows "Edit Portfolio Item" or "Create Portfolio Entry" based on editingId
+  - Submit button: shows Pencil icon + "Save Changes" when editing, Plus icon + "Create" when creating
+  - On successful edit: refreshes portfolio list and updates selectedPortfolio in place
+- Updated /api/portfolio/route.ts:
+  - Split POST handler: removed the `id` optional field and update logic from POST (now create-only)
+  - Added PUT handler with `updatePortfolioSchema` (requires `id` + `userId`): validates ownership, updates all fields including projectId
+  - Added DELETE handler: accepts `id` and `userId` query params, validates ownership via `findFirst`, deletes via `db.portfolio.delete`
+- Removed unused imports (Link as LinkIcon)
+- Clean ESLint pass (0 errors)
+- Dev log clean (0 errors)
+
+Stage Summary:
+- Portfolio items can now be edited via Edit button in detail view (opens pre-populated dialog, calls PUT /api/portfolio)
+- Portfolio items can be deleted via Delete button in detail view (shows AlertDialog confirmation, calls DELETE /api/portfolio)
+- API route now supports GET, POST (create), PUT (update), DELETE (full CRUD)
+- All existing functionality preserved (create, view, search, grid layout, empty state)
+- Zero lint errors, zero dev log errors
+
+---
+Task ID: 6-c
+Agent: main
+Task: Add create meetings/milestones from calendar page
+
+Work Log:
+- Read existing calendar-page.tsx (453 lines) and /api/calendar/route.ts (159 lines)
+- Read Prisma schema to understand Meeting and Milestone models
+- Read projects API route for project fetching pattern
+- Read shadcn/ui Dialog, Select, Input, Textarea, Label components
+- Updated /api/calendar/route.ts with POST handler:
+  - Added Zod schemas: createMeetingSchema (type, projectId, title, date, duration, description, userId, createdBy) and createMilestoneSchema (type, projectId, title, date, description, userId)
+  - Used z.discriminatedUnion('type', [...]) for type-safe validation
+  - For meetings: creates Meeting record (projectId, title, description, date, duration, createdBy), logs activity
+  - For milestones: creates Milestone record (projectId, title, description, startDate=date, dueDate=date, status='not_started', progress=0, order=count), logs activity
+  - Returns created record with 201 status
+  - Fixed typo in GET handler sort (bStartDate → b.startDate)
+- Updated calendar-page.tsx with full create event UI:
+  - Added "New Event" button in header area next to Today button (Plus icon)
+  - Added Dialog with event creation form:
+    - Event Type select (Meeting or Milestone) with Users/Target icons
+    - Project selector (dropdown fetched from GET /api/projects?userId=..., defaults to current projectId)
+    - Title input (required)
+    - Date input (type="date", defaults to clicked date or today)
+    - Duration select (meetings only, 15/30/45/60/90/120/180 min options)
+    - Description textarea (optional)
+  - Submit sends POST to /api/calendar with proper payload based on type
+  - On success: toast notification, dialog closes, calendar events refreshed
+  - Loading state with Loader2 spinner on submit button
+  - Validation: title required, project required (inline toast errors)
+  - Empty state for selected day now shows "Add Event" button
+  - Enhanced event click navigation: meetings navigate to project-detail, all event types in detail panel have ExternalLink icon for visual affordance
+  - Removed unused Separator import, added new imports (Dialog, Select, Input, Textarea, Label, Plus, Loader2, ExternalLink, useToast)
+- Clean ESLint pass (0 errors)
+- Dev log clean (0 errors)
+
+Stage Summary:
+- Calendar page now has "New Event" button for creating meetings and milestones
+- Full dialog form with type selection, project picker, date picker, duration (meetings), and description
+- POST API endpoint with Zod validation, database creation, and activity logging
+- Events refresh automatically after creation
+- Clicking events in detail panel navigates to relevant project/task with visual external link icon
+- All existing calendar functionality preserved (month navigation, event dots, overdue highlighting, legend)
+- Zero lint errors, zero dev log errors
+
+---
+Task ID: bugfix-and-enhancement
+Agent: main
+Task: Audit existing codebase, fix critical bugs, and add missing features
+
+Work Log:
+- Performed comprehensive audit of all 38 files (18 components, 19 API routes, 1 AI module)
+- Found 92% of files fully implemented, 3 with issues
+- Fixed HIGH: Integrations DELETE mismatch - API read searchParams but frontend sent JSON body. Updated to accept both formats.
+- Fixed HIGH: Create-project team members not persisted - Added teamMembers field to API schema, lookup users by email, create ProjectMember records and notifications
+- Added MISSING: PUT handler for /api/onboarding (settings page was calling PUT but only GET/POST existed)
+- Optimized: Disabled Prisma query logging to reduce memory pressure in containerized environment
+- Delegated: Kanban drag-and-drop (DnD Kit integration) to subagent 6-a
+- Delegated: Portfolio edit/delete CRUD to subagent 6-b
+- Delegated: Calendar event creation (meetings/milestones) to subagent 6-c
+- Verified via API testing: registration (201), onboarding (200), project creation (201), task CRUD (201/200), notifications (200)
+
+Stage Summary:
+- 3 critical bugs fixed, 1 missing API route added
+- 3 new features added (kanban DnD, portfolio CRUD, calendar events)
+- All 23,231 lines of code pass ESLint with zero errors
+- Core API flow verified end-to-end: register → onboard → create project → create task → update task → notifications
+

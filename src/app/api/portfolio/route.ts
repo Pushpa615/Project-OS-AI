@@ -30,10 +30,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ========== POST: Create or update portfolio ==========
-const portfolioSchema = z.object({
+// ========== POST: Create portfolio ==========
+const createPortfolioSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
-  id: z.string().optional(), // If provided, update existing
   projectId: z.string().optional(),
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional().default(''),
@@ -48,7 +47,7 @@ const portfolioSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const parsed = portfolioSchema.safeParse(body)
+    const parsed = createPortfolioSchema.safeParse(body)
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -59,7 +58,6 @@ export async function POST(req: NextRequest) {
 
     const {
       userId,
-      id,
       projectId,
       title,
       description,
@@ -80,40 +78,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // If id is provided, update existing portfolio
-    if (id) {
-      const existing = await db.portfolio.findFirst({
-        where: { id, userId },
-      })
-
-      if (!existing) {
-        return NextResponse.json(
-          { error: 'Portfolio not found' },
-          { status: 404 }
-        )
-      }
-
-      const updated = await db.portfolio.update({
-        where: { id },
-        data: {
-          title,
-          description,
-          technologies: JSON.stringify(technologies),
-          contribution,
-          screenshots: JSON.stringify(screenshots),
-          githubUrl: githubUrl || null,
-          liveUrl: liveUrl || null,
-          isPublic,
-        },
-      })
-
-      return NextResponse.json({
-        data: updated,
-        message: 'Portfolio updated successfully',
-      })
-    }
-
-    // Create new portfolio
     const portfolio = await db.portfolio.create({
       data: {
         userId,
@@ -134,9 +98,139 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Create/update portfolio error:', error)
+    console.error('Create portfolio error:', error)
     return NextResponse.json(
-      { error: 'Failed to save portfolio' },
+      { error: 'Failed to create portfolio' },
+      { status: 500 }
+    )
+  }
+}
+
+// ========== PUT: Update portfolio ==========
+const updatePortfolioSchema = z.object({
+  id: z.string().min(1, 'Portfolio ID is required'),
+  userId: z.string().min(1, 'User ID is required'),
+  projectId: z.string().optional(),
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional().default(''),
+  technologies: z.array(z.string()).optional().default([]),
+  contribution: z.string().optional().default(''),
+  screenshots: z.array(z.string()).optional().default([]),
+  githubUrl: z.string().optional().default(''),
+  liveUrl: z.string().optional().default(''),
+  isPublic: z.boolean().default(false),
+})
+
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const parsed = updatePortfolioSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const {
+      id,
+      userId,
+      projectId,
+      title,
+      description,
+      technologies,
+      contribution,
+      screenshots,
+      githubUrl,
+      liveUrl,
+      isPublic,
+    } = parsed.data
+
+    // Verify the portfolio exists and belongs to the user
+    const existing = await db.portfolio.findFirst({
+      where: { id, userId },
+    })
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Portfolio not found' },
+        { status: 404 }
+      )
+    }
+
+    const updated = await db.portfolio.update({
+      where: { id },
+      data: {
+        title,
+        description,
+        technologies: JSON.stringify(technologies),
+        contribution,
+        screenshots: JSON.stringify(screenshots),
+        githubUrl: githubUrl || null,
+        liveUrl: liveUrl || null,
+        isPublic,
+        projectId: projectId || null,
+      },
+    })
+
+    return NextResponse.json({
+      data: updated,
+      message: 'Portfolio updated successfully',
+    })
+  } catch (error) {
+    console.error('Update portfolio error:', error)
+    return NextResponse.json(
+      { error: 'Failed to update portfolio' },
+      { status: 500 }
+    )
+  }
+}
+
+// ========== DELETE: Delete portfolio ==========
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    const userId = searchParams.get('userId')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'id query parameter is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId query parameter is required' },
+        { status: 400 }
+      )
+    }
+
+    // Verify the portfolio exists and belongs to the user
+    const existing = await db.portfolio.findFirst({
+      where: { id, userId },
+    })
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Portfolio not found' },
+        { status: 404 }
+      )
+    }
+
+    await db.portfolio.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({
+      message: 'Portfolio deleted successfully',
+    })
+  } catch (error) {
+    console.error('Delete portfolio error:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete portfolio' },
       { status: 500 }
     )
   }

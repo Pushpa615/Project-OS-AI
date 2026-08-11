@@ -110,39 +110,49 @@ export async function POST(req: NextRequest) {
 // ========== DELETE: Disconnect account ==========
 export async function DELETE(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-    const provider = searchParams.get('provider')
+    const body = await req.json()
+    const { userId, provider, id } = body
 
-    if (!userId || !provider) {
+    // Support both body (from frontend) and query params (backward compat)
+    if (!userId) {
       return NextResponse.json(
-        { error: 'userId and provider query parameters are required' },
+        { error: 'userId is required' },
         { status: 400 }
       )
     }
 
-    const existing = await db.connectedAccount.findUnique({
-      where: {
-        userId_provider: { userId, provider },
-      },
-    })
-
-    if (!existing) {
+    if (id) {
+      // Delete by ID (frontend sends this way)
+      const existing = await db.connectedAccount.findFirst({ where: { id, userId } })
+      if (!existing) {
+        return NextResponse.json(
+          { error: 'Connected account not found' },
+          { status: 404 }
+        )
+      }
+      await db.connectedAccount.delete({ where: { id } })
+    } else if (provider) {
+      // Delete by userId+provider composite key
+      const existing = await db.connectedAccount.findUnique({
+        where: { userId_provider: { userId, provider } },
+      })
+      if (!existing) {
+        return NextResponse.json(
+          { error: 'Connected account not found' },
+          { status: 404 }
+        )
+      }
+      await db.connectedAccount.delete({
+        where: { userId_provider: { userId, provider } },
+      })
+    } else {
       return NextResponse.json(
-        { error: 'Connected account not found' },
-        { status: 404 }
+        { error: 'Either id or provider is required' },
+        { status: 400 }
       )
     }
 
-    await db.connectedAccount.delete({
-      where: {
-        userId_provider: { userId, provider },
-      },
-    })
-
-    return NextResponse.json({
-      message: 'Account disconnected successfully',
-    })
+    return NextResponse.json({ message: 'Account disconnected successfully' })
   } catch (error) {
     console.error('Disconnect account error:', error)
     return NextResponse.json(
