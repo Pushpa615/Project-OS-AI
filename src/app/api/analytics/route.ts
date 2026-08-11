@@ -1,43 +1,77 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-// ========== GET: Get analytics for project ==========
+// ========== GET: Get analytics for project or user ==========
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
+    const userId = searchParams.get('userId')
 
-    if (!projectId) {
+    // Determine which projects to analyze
+    let projectIds: string[] = []
+    let projectName = 'All Projects'
+    let projectStatus = ''
+    let projectProgress = 0
+    let projectDeadline: Date | null = null
+    let projectCreatedAt = new Date()
+
+    if (projectId) {
+      // Single project analytics
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: {
+          members: {
+            include: { user: { select: { id: true, name: true, avatar: true } } },
+          },
+        },
+      })
+      if (!project) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      }
+      projectIds = [projectId]
+      projectName = project.name
+      projectStatus = project.status
+      projectProgress = project.progress
+      projectDeadline = project.deadline
+      projectCreatedAt = project.createdAt
+    } else if (userId) {
+      // User-level analytics across all projects
+      const userProjects = await db.project.findMany({
+        where: {
+          OR: [
+            { createdBy: userId },
+            { members: { some: { userId } } },
+          ],
+          status: { not: 'archived' },
+        },
+        select: { id: true },
+      })
+      projectIds = userProjects.map((p) => p.id)
+      if (projectIds.length === 0) {
+        return NextResponse.json({
+          data: {
+            project: { id: '', name: 'All Projects', status: '', progress: 0, createdAt: new Date(), deadline: null, daysRemaining: null },
+            taskStats: { total: 0, notStarted: 0, inProgress: 0, submitted: 0, underReview: 0, verifiedCompleted: 0, overdue: 0, completionRate: 0, averageProgress: 0 },
+            milestoneStats: [],
+            teamStats: [],
+            overdueCount: 0,
+            overdueTasks: [],
+            priorityDistribution: { critical: 0, high: 0, medium: 0, low: 0 },
+            recentActivity: 0,
+          },
+        })
+      }
+    } else {
       return NextResponse.json(
-        { error: 'projectId query parameter is required' },
+        { error: 'projectId or userId query parameter is required' },
         { status: 400 }
       )
     }
 
-    // Check project exists
-    const project = await db.project.findUnique({
-      where: { id: projectId },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: { id: true, name: true, avatar: true },
-            },
-          },
-        },
-      },
-    })
-
-    if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
-    }
-
-    // Get all tasks for this project
+    // Get all tasks for selected projects
     const tasks = await db.task.findMany({
-      where: { projectId },
+      where: { projectId: { in: projectIds } },
       include: {
         assignee: {
           select: { id: true, name: true },
@@ -48,9 +82,9 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // Get milestones
+    // Get milestones for selected projects
     const milestones = await db.milestone.findMany({
-      where: { projectId },
+      where: { projectId: { in: projectIds } },
       include: {
         _count: { select: { tasks: true } },
         tasks: {
@@ -65,9 +99,8 @@ export async function GET(req: NextRequest) {
       total: tasks.length,
       notStarted: tasks.filter((t) => t.status === 'not_started').length,
       inProgress: tasks.filter((t) => t.status === 'in_progress').length,
-      submitted: tasks.filter((t) => t.status === 'submitted').length,
-      underReview: tasks.filter((t) => t.status === 'under_review').length,
-      verifiedCompleted: tasks.filter((t) => t.status === 'verified_completed').length,
+      blocked: tasks.filter((t) => t.status === 'blocked').length,
+      completed: tasks.filter((t) => t.status === 'verified_completed').length,
       overdue: tasks.filter((t) => t.status === 'overdue').length,
       completionRate: tasks.length > 0
         ? Math.round((tasks.filter((t) => t.status === 'verified_completed').length / tasks.length) * 100)
@@ -95,12 +128,16 @@ export async function GET(req: NextRequest) {
     })
 
     // Calculate team contribution stats
-    const memberIds = project.members.map((m) => m.userId)
+    const allMembers = await db.projectMember.findMany({
+      where: { projectId: { in: projectIds } },
+      include: { user: { select: { id: true, name: true, avatar: true } } },
+    })
+    const uniqueMemberIds = [...new Set(allMembers.map((m) => m.userId))]
     const teamStats: Array<{userId: string; name: string; role: string; avatar: string | null; totalTasks: number; completedTasks: number; inProgressTasks: number; overdueTasks: number; totalHours: number; estimatedHours: number; checkinCount: number; contributionScore: number}> = []
 
-    for (const memberId of memberIds) {
+    for (const memberId of uniqueMemberIds) {
       const memberTasks = tasks.filter((t) => t.assignedTo === memberId)
-      const member = project.members.find((m) => m.userId === memberId)
+      const member = allMembers.find((m) => m.userId === memberId)
       const checkinCount = await db.dailyCheckin.count({
         where: { userId: memberId },
       })
@@ -150,14 +187,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       data: {
         project: {
-          id: project.id,
-          name: project.name,
-          status: project.status,
-          progress: project.progress,
-          createdAt: project.createdAt,
-          deadline: project.deadline,
-          daysRemaining: project.deadline
-            ? Math.max(0, Math.ceil((project.deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+          id: projectId || '',
+          name: projectName,
+          status: projectStatus,
+          progress: projectProgress,
+          createdAt: projectCreatedAt,
+          deadline: projectDeadline,
+          daysRemaining: projectDeadline
+            ? Math.max(0, Math.ceil((projectDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
             : null,
         },
         taskStats,

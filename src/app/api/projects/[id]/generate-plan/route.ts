@@ -93,18 +93,19 @@ export async function POST(
       const milestones = plan.milestones || []
       const tasks = plan.tasks || []
 
-      const createdMilestones: Array<{id: string; title: string; description: string | null; order: number; projectId: string; _index: number}> = []
+      const createdMilestones: Array<{id: string; title: string; description: string | null; order: number; projectId: string; arrayIndex: number}> = []
 
-      for (const milestone of milestones) {
+      for (let i = 0; i < milestones.length; i++) {
+        const milestone = milestones[i]
         const created = await db.milestone.create({
           data: {
             projectId: id,
             title: milestone.title,
             description: milestone.description || null,
-            order: milestone.order || 0,
+            order: milestone.order ?? i,
           },
         })
-        createdMilestones.push({ ...created, _index: milestone.order || 0 })
+        createdMilestones.push({ ...created, arrayIndex: i })
       }
 
       // Create tasks and link to milestones
@@ -112,10 +113,10 @@ export async function POST(
       const taskIdMap = new Map<number, string>() // task order -> task id
 
       for (const task of tasks) {
-        const milestoneIndex = task.milestoneIndex || 0
-        const matchingMilestone = createdMilestones.find(
-          (m) => m._index === milestoneIndex
-        )
+        const milestoneIndex = task.milestoneIndex ?? 0
+        const matchingMilestone = createdMilestones[
+          milestoneIndex
+        ]
 
         const created = await db.task.create({
           data: {
