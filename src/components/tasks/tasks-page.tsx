@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   ArrowLeft,
+  ArrowRight,
   Clock,
   AlertCircle,
   Filter,
@@ -15,8 +16,14 @@ import {
   CheckCircle,
   XCircle,
   GripVertical,
+  MoreHorizontal,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -40,6 +47,7 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useNavStore } from '@/lib/nav-store'
+import { cn } from '@/lib/utils'
 
 // ==================== TYPES ====================
 
@@ -101,7 +109,7 @@ function formatDate(dateStr: string | null): string {
 
 // ==================== DRAGGABLE TASK CARD ====================
 
-function DraggableTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
+function DraggableTaskCard({ task, onClick, onStatusChange }: { task: Task; onClick: () => void; onStatusChange: (taskId: string, newStatus: string) => void }) {
   const pConfig = priorityConfig[task.priority] || priorityConfig.medium
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -112,21 +120,52 @@ function DraggableTaskCard({ task, onClick }: { task: Task; onClick: () => void 
     ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }
     : undefined
 
+  // Find next and previous status for quick actions
+  const currentIdx = COLUMNS.findIndex((c) => c.key === task.status)
+  const nextStatus = currentIdx >= 0 && currentIdx < COLUMNS.length - 1 ? COLUMNS[currentIdx + 1] : null
+
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <Card
-        className="cursor-grab hover:shadow-sm transition-shadow border rounded-lg active:cursor-grabbing"
-        onClick={onClick}
-      >
+      <Card className="cursor-grab hover:shadow-sm transition-shadow border rounded-lg active:cursor-grabbing group">
         <CardContent className="p-3.5 space-y-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-1.5 min-w-0">
-              <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0 mt-0.5" {...listeners} />
+              <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0 mt-0.5 hidden sm:block" {...listeners} />
               <h4 className="text-sm font-medium leading-snug line-clamp-2">{task.title}</h4>
             </div>
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 shrink-0 ${pConfig.color}`}>
-              {pConfig.label}
-            </Badge>
+            <div className="flex items-center gap-1 shrink-0">
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${pConfig.color}`}>
+                {pConfig.label}
+              </Badge>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity sm:hidden"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-44 p-1" align="end">
+                  {COLUMNS.filter((c) => c.key !== task.status).map((col) => {
+                    const ColIcon = col.icon
+                    return (
+                      <button
+                        key={col.key}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onStatusChange(task.id, col.key)
+                        }}
+                        className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded-md hover:bg-accent transition-colors text-left"
+                      >
+                        <ColIcon className={cn('h-3.5 w-3.5', col.color)} />
+                        <span>Move to {col.label}</span>
+                      </button>
+                    )
+                  })}
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           {/* Assignee */}
@@ -147,19 +186,48 @@ function DraggableTaskCard({ task, onClick }: { task: Task; onClick: () => void 
             </div>
           )}
 
-          {/* Progress */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">{Math.round(task.completionPercent)}%</span>
+          {/* Footer: progress + quick move button */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-medium">{Math.round(task.completionPercent)}%</span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-1">
+                <div
+                  className="bg-primary rounded-full h-1 transition-all"
+                  style={{ width: `${task.completionPercent}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-secondary rounded-full h-1">
-              <div
-                className="bg-primary rounded-full h-1 transition-all"
-                style={{ width: `${task.completionPercent}%` }}
-              />
-            </div>
+            {nextStatus && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onStatusChange(task.id, nextStatus.key)
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-primary/5 text-primary hover:bg-primary/10 transition-colors shrink-0"
+                title={`Move to ${nextStatus.label}`}
+              >
+                <ArrowRight className="h-3 w-3" />
+                <span className="hidden lg:inline">{nextStatus.label}</span>
+              </button>
+            )}
           </div>
+
+          {/* Evidence & comments indicators */}
+          {(task._count.evidence > 0 || task._count.taskComments > 0) && (
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              {task._count.evidence > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <CheckCircle className="h-3 w-3" /> {task._count.evidence} evidence
+                </span>
+              )}
+              {task._count.taskComments > 0 && (
+                <span>{task._count.taskComments} comments</span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -200,11 +268,13 @@ function DroppableColumn({
   tasks,
   navigate,
   updatingTaskId,
+  onStatusChange,
 }: {
   column: (typeof COLUMNS)[number]
   tasks: Task[]
   navigate: (page: Parameters<ReturnType<typeof useNavStore.getState>['navigate']>[0], params?: Record<string, string>) => void
   updatingTaskId: string | null
+  onStatusChange: (taskId: string, newStatus: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${column.key}`,
@@ -252,6 +322,7 @@ function DroppableColumn({
               <DraggableTaskCard
                 task={task}
                 onClick={() => navigate('task-detail', { id: task.id })}
+                onStatusChange={onStatusChange}
               />
               {updatingTaskId === task.id && (
                 <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60">
@@ -349,6 +420,33 @@ export function TasksPage({ userId, projectId }: { userId: string; projectId?: s
       tasksBeforeDrag.current = [...allTasks]
     }
   }, [allTasks])
+
+  // Quick status change (for mobile and quick-action button)
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: string) => {
+    const task = allTasks.find((t) => t.id === taskId)
+    if (!task || task.status === newStatus) return
+
+    setUpdatingTaskId(taskId)
+    setAllTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+    )
+
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, userId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to update task status')
+    } catch {
+      setAllTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t))
+      )
+    } finally {
+      setUpdatingTaskId(null)
+    }
+  }, [allTasks, userId])
 
   // Handle drag end — optimistic update with API call and revert on failure
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -476,6 +574,7 @@ export function TasksPage({ userId, projectId }: { userId: string; projectId?: s
                   tasks={columnsMap[col.key]}
                   navigate={navigate}
                   updatingTaskId={updatingTaskId}
+                  onStatusChange={handleStatusChange}
                 />
               ))}
             </div>

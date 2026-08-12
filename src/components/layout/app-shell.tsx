@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { useRealtimeNotifications } from '@/lib/realtime-notifications'
-import { X } from 'lucide-react'
+import { X, Heart } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -378,6 +378,14 @@ export function AppShell({
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+
+        {/* Footer */}
+        <footer className="border-t bg-card px-4 py-2 flex items-center justify-between text-xs text-muted-foreground shrink-0">
+          <span className="flex items-center gap-1">
+            Built with <Heart className="h-3 w-3 text-red-400 fill-red-400" /> by Project OS AI
+          </span>
+          <span className="hidden sm:inline">v1.0.0</span>
+        </footer>
 
         {/* Real-time notification toast */}
         {toast && (

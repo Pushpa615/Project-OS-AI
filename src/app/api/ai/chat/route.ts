@@ -9,7 +9,7 @@ const aiChatSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   projectId: z.string().optional(),
   taskId: z.string().optional(),
-  type: z.enum(['general', 'code_help', 'bug_help', 'planning']).default('general'),
+  type: z.enum(['general', 'code_help', 'bug_help', 'planning', 'code', 'bug', 'docs', 'deadline']).default('general'),
   question: z.string().min(1, 'Question is required'),
   context: z.string().optional().default(''),
 })
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       let response = ''
 
       switch (type) {
+        case 'code':
         case 'code_help': {
           // Need task/project for code help
           const task = taskId
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
           break
         }
 
+        case 'bug':
         case 'bug_help': {
           const project = projectId
             ? await db.project.findUnique({

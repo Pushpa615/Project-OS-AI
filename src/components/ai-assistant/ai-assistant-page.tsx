@@ -1,14 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavStore } from '@/lib/nav-store'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import {
   Select,
@@ -27,14 +26,22 @@ import {
   Loader2,
   Copy,
   Check,
-  AlertTriangle,
   Sparkles,
   Lightbulb,
+  ArrowDown,
+  RotateCcw,
+  MessageSquare,
+  Zap,
+  BookOpen,
   Clock,
+  ChevronRight,
   Trash2,
-  BarChart3,
+  Terminal,
 } from 'lucide-react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
+import { cn } from '@/lib/utils'
+
+// ==================== TYPES ====================
 
 interface Project {
   id: string
@@ -50,8 +57,9 @@ interface Task {
 }
 
 interface ChatMessage {
-  question: string
-  response: string
+  id: string
+  role: 'user' | 'assistant'
+  content: string
   type: string
   timestamp: string
 }
@@ -61,6 +69,15 @@ interface AIAssistantPageProps {
   projectId?: string
   taskId?: string
 }
+
+type AssistantMode = 'code' | 'bug' | 'docs' | 'deadline'
+
+const MODES: { value: AssistantMode; label: string; icon: React.ElementType; color: string; description: string }[] = [
+  { value: 'code', label: 'Code Help', icon: Code2, color: 'text-emerald-500', description: 'Get coding assistance' },
+  { value: 'bug', label: 'Bug Fix', icon: Bug, color: 'text-red-500', description: 'Debug and fix issues' },
+  { value: 'docs', label: 'Docs', icon: FileText, color: 'text-violet-500', description: 'Generate documentation' },
+  { value: 'deadline', label: 'Timeline', icon: CalendarClock, color: 'text-amber-500', description: 'Analyze deadlines' },
+]
 
 const DOC_TYPES = [
   { value: 'README', label: 'README' },
@@ -74,98 +91,230 @@ const DOC_TYPES = [
   { value: 'Demo Script', label: 'Demo Script' },
 ]
 
+const SUGGESTED_PROMPTS: Record<AssistantMode, string[]> = {
+  code: [
+    'How do I implement user authentication?',
+    'Help me optimize this database query',
+    'Review my API endpoint design',
+    'Suggest a file structure for my project',
+  ],
+  bug: [
+    'I am getting a 500 error on my API',
+    'My component is not re-rendering on state change',
+    'Database connection is timing out',
+    'Help me fix a memory leak',
+  ],
+  docs: [
+    'Generate a comprehensive README',
+    'Create an SRS document',
+    'Write API documentation',
+    'Create an architecture overview',
+  ],
+  deadline: [
+    'Analyze my project timeline',
+    'What tasks are at risk?',
+    'Suggest a catch-up plan',
+    'Help me prioritize overdue tasks',
+  ],
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-start gap-3 px-4 py-2">
+      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <Bot className="h-4 w-4 text-primary" />
+      </div>
+      <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:0ms]" />
+          <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:150ms]" />
+          <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:300ms]" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CodeBlock({ code, onCopy }: { code: string; onCopy: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code)
+    setCopied(true)
+    onCopy()
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="group relative mt-2 rounded-lg bg-zinc-950 dark:bg-zinc-900 border overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 dark:bg-zinc-800 border-b">
+        <Terminal className="h-3.5 w-3.5 text-zinc-400" />
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre className="p-3 overflow-x-auto text-sm text-zinc-200 font-mono leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  )
+}
+
+function MessageBubble({ message, mode }: { message: ChatMessage; mode: AssistantMode }) {
+  const isUser = message.role === 'user'
+  const modeConfig = MODES.find((m) => m.value === mode)
+
+  // Parse content for code blocks
+  const parts = message.content.split(/(```[\s\S]*?```)/g)
+  const renderedParts = parts.map((part, i) => {
+    if (part.startsWith('```') && part.endsWith('```')) {
+      const code = part.slice(3, -3).replace(/^\w+\n/, '')
+      return <CodeBlock key={i} code={code} onCopy={() => {}} />
+    }
+    return <span key={i}>{part}</span>
+  })
+
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-3 px-4 py-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-300',
+        isUser ? 'flex-row-reverse' : ''
+      )}
+    >
+      {!isUser ? (
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <Sparkles className="h-4 w-4 text-primary" />
+        </div>
+      ) : (
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+            You
+          </AvatarFallback>
+        </Avatar>
+      )}
+      <div
+        className={cn(
+          'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+          isUser
+            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+            : 'bg-muted rounded-tl-sm'
+        )}
+      >
+        {isUser ? (
+          <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <div className="space-y-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Bot className={cn('h-3.5 w-3.5', modeConfig?.color)} />
+              <span className="text-xs font-medium text-muted-foreground">
+                {modeConfig?.label} Assistant
+              </span>
+            </div>
+            <div className="whitespace-pre-wrap text-foreground/90">{renderedParts}</div>
+          </div>
+        )}
+        <p
+          className={cn(
+            'text-[10px] mt-1.5',
+            isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
+          )}
+        >
+          {formatDistanceToNow(parseISO(message.timestamp), { addSuffix: true })}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ==================== MAIN COMPONENT ====================
+
 export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPageProps) {
   const navigate = useNavStore((s) => s.navigate)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Projects & tasks for selectors
+  // Projects & tasks
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [projectsLoading, setProjectsLoading] = useState(true)
 
-  // Shared AI state
+  // Mode
+  const [activeMode, setActiveMode] = useState<AssistantMode>('code')
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId || '')
+  const [selectedDocType, setSelectedDocType] = useState('')
+
+  // Chat
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Tab 1: Code Assistant
-  const [codeProjectId, setCodeProjectId] = useState<string>(projectId || '')
-  const [codeTaskId, setCodeTaskId] = useState<string>(taskId || '')
-  const [codeQuestion, setCodeQuestion] = useState('')
-  const [codeHistory, setCodeHistory] = useState<ChatMessage[]>([])
-
-  // Tab 2: Bug Assistant
-  const [bugErrorMessage, setBugErrorMessage] = useState('')
-  const [bugRelevantCode, setBugRelevantCode] = useState('')
-  const [bugExpected, setBugExpected] = useState('')
-  const [bugActual, setBugActual] = useState('')
-  const [bugResponse, setBugResponse] = useState('')
-  const [bugHistory, setBugHistory] = useState<ChatMessage[]>([])
-
-  // Tab 3: Documentation
-  const [docProjectId, setDocProjectId] = useState<string>(projectId || '')
-  const [docType, setDocType] = useState('')
-  const [docResponse, setDocResponse] = useState('')
-  const [copied, setCopied] = useState(false)
-
-  // Tab 4: Deadline Manager
-  const [deadlineProjectId, setDeadlineProjectId] = useState<string>(projectId || '')
-  const [deadlineResponse, setDeadlineResponse] = useState('')
-  const [overdueTasks, setOverdueTasks] = useState<Task[]>([])
+  const [showScrollDown, setShowScrollDown] = useState(false)
 
   // Fetch projects
-  const fetchProjects = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/projects?userId=${userId}`)
-      const json = await res.json()
-      if (json.data) setProjects(json.data)
-    } catch {
-      // silent
-    } finally {
-      setProjectsLoading(false)
-    }
-  }, [userId])
-
-  // Fetch tasks for a project
-  const fetchTasks = useCallback(async (pid: string) => {
-    if (!pid) {
-      setTasks([])
-      return
-    }
-    try {
-      const res = await fetch(`/api/tasks?projectId=${pid}`)
-      const json = await res.json()
-      if (json.data) setTasks(json.data)
-    } catch {
-      // silent
-    }
-  }, [])
-
-  // Fetch overdue tasks
-  const fetchOverdue = useCallback(async (pid: string) => {
-    if (!pid) return
-    try {
-      const res = await fetch(`/api/tasks?projectId=${pid}&status=overdue`)
-      const json = await res.json()
-      if (json.data) setOverdueTasks(json.data)
-    } catch {
-      // silent
-    }
-  }, [])
-
   useEffect(() => {
+    async function fetchProjects() {
+      try {
+        const res = await fetch(`/api/projects?userId=${userId}`)
+        const json = await res.json()
+        if (json.data) {
+          setProjects(json.data)
+          // Auto-select first project if none selected
+          if (!projectId && json.data.length > 0) {
+            setSelectedProjectId(json.data[0].id)
+          }
+        }
+      } catch {
+        // silent
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
     fetchProjects()
-  }, [fetchProjects])
+  }, [userId, projectId])
 
+  // Fetch tasks when project changes
   useEffect(() => {
-    if (codeProjectId) fetchTasks(codeProjectId)
-  }, [codeProjectId, fetchTasks])
+    async function fetchTasks() {
+      if (!selectedProjectId) {
+        setTasks([])
+        return
+      }
+      try {
+        const res = await fetch(`/api/tasks?projectId=${selectedProjectId}`)
+        const json = await res.json()
+        if (json.data) setTasks(json.data)
+      } catch {
+        // silent
+      }
+    }
+    fetchTasks()
+  }, [selectedProjectId])
 
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (deadlineProjectId) fetchOverdue(deadlineProjectId)
-  }, [deadlineProjectId, fetchOverdue])
+    if (scrollRef.current) {
+      const el = scrollRef.current
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+      if (isNearBottom) {
+        el.scrollTop = el.scrollHeight
+      }
+    }
+  }, [messages, loading])
 
-  // AI request helper — accepts explicit projectId/taskId overrides
+  // Track scroll position
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) {
+      const el = scrollRef.current
+      setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 100)
+    }
+  }, [])
+
+  // AI request
   const callAI = useCallback(
-    async (type: string, question: string, context: string = '', overrides?: { projectId?: string; taskId?: string }) => {
+    async (type: string, question: string, context: string = '') => {
       setLoading(true)
       setError(null)
       try {
@@ -174,8 +323,8 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
-            projectId: overrides?.projectId || projectId || undefined,
-            taskId: overrides?.taskId || taskId || undefined,
+            projectId: selectedProjectId || projectId || undefined,
+            taskId: taskId || undefined,
             type,
             question,
             context,
@@ -194,589 +343,308 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
         setLoading(false)
       }
     },
-    [userId, projectId, taskId]
+    [userId, selectedProjectId, projectId, taskId]
   )
 
-  // Code assistant submit
-  const handleCodeSubmit = async () => {
-    if (!codeQuestion.trim()) return
-    const response = await callAI('code_help', codeQuestion, undefined, { projectId: codeProjectId, taskId: codeTaskId || undefined })
+  // Send message
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || loading) return
+
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content: input.trim(),
+      type: activeMode,
+      timestamp: new Date().toISOString(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setInput('')
+
+    // Build context based on mode
+    let aiType = activeMode
+    let context = ''
+
+    if (activeMode === 'docs') {
+      aiType = 'general'
+      context = `Document Type: ${selectedDocType}`
+    } else if (activeMode === 'deadline') {
+      aiType = 'general'
+      // Fetch overdue tasks for context
+      try {
+        const res = await fetch(`/api/tasks?projectId=${selectedProjectId}&status=overdue`)
+        const json = await res.json()
+        if (json.data && json.data.length > 0) {
+          context = `Overdue tasks: ${json.data.map((t: Task) => t.title).join(', ')}`
+        }
+      } catch {
+        // silent
+      }
+    }
+
+    const response = await callAI(aiType, input.trim(), context)
+
     if (response) {
-      setCodeHistory((prev) => [
-        { question: codeQuestion, response, type: 'code_help', timestamp: new Date().toISOString() },
-        ...prev,
-      ])
-      setCodeQuestion('')
+      const assistantMessage: ChatMessage = {
+        id: `msg-${Date.now()}-ai`,
+        role: 'assistant',
+        content: response,
+        type: activeMode,
+        timestamp: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    }
+
+    // Focus input again
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }, [input, loading, activeMode, selectedDocType, selectedProjectId, callAI])
+
+  // Handle suggested prompt click
+  const handleSuggestionClick = (prompt: string) => {
+    setInput(prompt)
+    inputRef.current?.focus()
+  }
+
+  // Clear chat
+  const handleClearChat = () => {
+    setMessages([])
+    setError(null)
+  }
+
+  // Scroll to bottom
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }
 
-  // Bug assistant submit
-  const handleBugSubmit = async () => {
-    if (!bugErrorMessage.trim()) return
-    const context = [
-      bugRelevantCode ? `Relevant Code:\n${bugRelevantCode}` : '',
-      bugExpected ? `Expected Behavior: ${bugExpected}` : '',
-      bugActual ? `Actual Behavior: ${bugActual}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n')
-
-    const response = await callAI('bug_help', bugErrorMessage, context, { projectId })
-    if (response) {
-      setBugHistory((prev) => [
-        { question: bugErrorMessage, response, type: 'bug_help', timestamp: new Date().toISOString() },
-        ...prev,
-      ])
-      setBugResponse(response)
-      setBugErrorMessage('')
-      setBugRelevantCode('')
-      setBugExpected('')
-      setBugActual('')
-    }
-  }
-
-  // Documentation submit
-  const handleDocGenerate = async () => {
-    if (!docProjectId || !docType) return
-    const question = `Generate a ${docType} document for this project. Include all relevant sections, be comprehensive and professional.`
-    const response = await callAI('general', question, undefined, { projectId: docProjectId })
-    if (response) {
-      setDocResponse(response)
-    }
-  }
-
-  // Deadline manager submit
-  const handleDeadlineAnalyze = async () => {
-    if (!deadlineProjectId) return
-    const overdueInfo = overdueTasks
-      .map((t) => ` - ${t.title} (${t.status})`)
-      .join('\n')
-    const question = `Analyze the current project timeline and provide: 1) Timeline status assessment, 2) Overdue task analysis, 3) Risk identification, 4) Specific AI-powered recommendations for getting back on track.\n\nOverdue tasks:\n${overdueInfo || 'None'}`
-    const response = await callAI('general', question, undefined, { projectId: deadlineProjectId })
-    if (response) {
-      setDeadlineResponse(response)
-    }
-  }
-
-  // Copy to clipboard
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const clearHistory = (setter: React.Dispatch<React.SetStateAction<ChatMessage[]>>) => {
-    setter([])
-  }
+  const modeConfig = MODES.find((m) => m.value === activeMode)
+  const hasMessages = messages.length > 0
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary" />
+    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+      {/* ==================== HEADER ==================== */}
+      <div className="border-b bg-card px-4 py-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Bot className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">AI Assistant</h1>
+              <p className="text-xs text-muted-foreground">Powered by AI to help you build better</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">AI Assistant</h1>
-            <p className="text-sm text-muted-foreground">
-              Powered by AI to help you build better
-            </p>
+          <div className="flex items-center gap-2">
+            {/* Project selector */}
+            {!projectsLoading && projects.length > 0 && (
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {hasMessages && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleClearChat}
+                title="Clear chat"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="code" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-            <TabsTrigger value="code" className="gap-1.5 text-xs sm:text-sm">
-              <Code2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Code</span>
-            </TabsTrigger>
-            <TabsTrigger value="bug" className="gap-1.5 text-xs sm:text-sm">
-              <Bug className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Bug</span>
-            </TabsTrigger>
-            <TabsTrigger value="docs" className="gap-1.5 text-xs sm:text-sm">
-              <FileText className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Docs</span>
-            </TabsTrigger>
-            <TabsTrigger value="deadline" className="gap-1.5 text-xs sm:text-sm">
-              <CalendarClock className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Deadlines</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* =========== TAB 1: Code Assistant =========== */}
-          <TabsContent value="code" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Code2 className="h-4 w-4 text-emerald-500" />
-                  Code Assistant
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Project selector */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Project</label>
-                    <Select value={codeProjectId} onValueChange={(v) => setCodeProjectId(v)}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {codeProjectId && (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Task (optional)</label>
-                      <Select value={codeTaskId} onValueChange={(v) => setCodeTaskId(v)}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Select task" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tasks.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Ask for help</label>
-                  <Textarea
-                    placeholder="Describe what you need help with..."
-                    value={codeQuestion}
-                    onChange={(e) => setCodeQuestion(e.target.value)}
-                    rows={3}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCodeSubmit()
-                    }}
-                  />
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {error}
-                  </p>
+        {/* Mode selector pills */}
+        <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1">
+          {MODES.map((mode) => {
+            const Icon = mode.icon
+            const isActive = activeMode === mode.value
+            return (
+              <button
+                key={mode.value}
+                onClick={() => setActiveMode(mode.value)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap',
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
                 )}
-
-                <Button onClick={handleCodeSubmit} disabled={loading || !codeQuestion.trim()}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Thinking...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Get Help
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Code history */}
-            {codeHistory.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-muted-foreground">History</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={() => clearHistory(setCodeHistory)}
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" /> Clear
-                  </Button>
-                </div>
-                {codeHistory.map((msg, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start gap-2">
-                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                          <span className="text-xs font-medium text-primary">You</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{msg.question}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {formatDistanceToNow(parseISO(msg.timestamp), { addSuffix: true })}
-                          </p>
-                        </div>
-                      </div>
-                      <Separator />
-                      <div className="flex items-start gap-2">
-                        <div className="h-7 w-7 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                            {msg.response}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {mode.label}
+              </button>
+            )
+          })}
+          {activeMode === 'docs' && (
+            <Select value={selectedDocType} onValueChange={setSelectedDocType}>
+              <SelectTrigger className="h-7 w-[150px] text-[11px] rounded-full border-dashed">
+                <SelectValue placeholder="Doc type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {DOC_TYPES.map((dt) => (
+                  <SelectItem key={dt.value} value={dt.value}>
+                    {dt.label}
+                  </SelectItem>
                 ))}
-              </div>
-            )}
-          </TabsContent>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
 
-          {/* =========== TAB 2: Bug Assistant =========== */}
-          <TabsContent value="bug" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Bug className="h-4 w-4 text-red-500" />
-                  Bug Assistant
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Error Message</label>
-                  <Textarea
-                    placeholder="Paste the error message or stack trace..."
-                    value={bugErrorMessage}
-                    onChange={(e) => setBugErrorMessage(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Relevant Code (optional)
-                  </label>
-                  <Textarea
-                    placeholder="Paste the code where the bug occurs..."
-                    value={bugRelevantCode}
-                    onChange={(e) => setBugRelevantCode(e.target.value)}
-                    rows={4}
-                    className="font-mono text-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Expected Behavior</label>
-                    <Input
-                      placeholder="What should happen?"
-                      value={bugExpected}
-                      onChange={(e) => setBugExpected(e.target.value)}
-                    />
+      {/* ==================== CHAT AREA ==================== */}
+      <div className="flex-1 overflow-hidden relative">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto"
+        >
+          {/* Empty state with suggestions */}
+          {!hasMessages && !loading && (
+            <div className="flex flex-col items-center justify-center h-full p-6">
+              <div className="max-w-md w-full text-center space-y-6">
+                {/* Mode icon & description */}
+                <div className="space-y-3">
+                  <div className={cn(
+                    'h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto',
+                    activeMode === 'code' && 'bg-emerald-500/10',
+                    activeMode === 'bug' && 'bg-red-500/10',
+                    activeMode === 'docs' && 'bg-violet-500/10',
+                    activeMode === 'deadline' && 'bg-amber-500/10'
+                  )}>
+                    {modeConfig && <modeConfig.icon className={cn('h-7 w-7', modeConfig.color)} />}
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Actual Behavior</label>
-                    <Input
-                      placeholder="What actually happens?"
-                      value={bugActual}
-                      onChange={(e) => setBugActual(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {error}
-                  </p>
-                )}
-
-                <Button onClick={handleBugSubmit} disabled={loading || !bugErrorMessage.trim()}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Bug className="h-4 w-4 mr-2" />
-                      Analyze Bug
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Bug response */}
-            {bugResponse && (
-              <Card className="border-red-200 dark:border-red-900/30">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center shrink-0">
-                      <Bug className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium mb-2">Bug Analysis</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                        {bugResponse}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Bug history */}
-            {bugHistory.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-muted-foreground">History</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={() => clearHistory(setBugHistory)}
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" /> Clear
-                  </Button>
-                </div>
-                {bugHistory.map((msg, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start gap-2">
-                        <div className="h-7 w-7 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <Bug className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium line-clamp-2">{msg.question}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {formatDistanceToNow(parseISO(msg.timestamp), { addSuffix: true })}
-                          </p>
-                        </div>
-                      </div>
-                      <Separator />
-                      <div className="flex items-start gap-2">
-                        <div className="h-7 w-7 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                          {msg.response}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* =========== TAB 3: Documentation Generator =========== */}
-          <TabsContent value="docs" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-violet-500" />
-                  Documentation Generator
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Project</label>
-                    <Select value={docProjectId} onValueChange={(v) => setDocProjectId(v)}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Document Type</label>
-                    <Select value={docType} onValueChange={(v) => setDocType(v)}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DOC_TYPES.map((dt) => (
-                          <SelectItem key={dt.value} value={dt.value}>
-                            {dt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {error}
-                  </p>
-                )}
-
-                <Button
-                  onClick={handleDocGenerate}
-                  disabled={loading || !docProjectId || !docType}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Generate
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Generated doc */}
-            {docResponse && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold">
-                      Generated: {docType}
-                    </CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleCopy(docResponse)}
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="h-3 w-3 mr-1" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3 mr-1" /> Copy
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-muted/50 rounded-lg p-4 max-h-[500px] overflow-y-auto">
-                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
-                      {docResponse}
-                    </pre>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* =========== TAB 4: Smart Deadline Manager =========== */}
-          <TabsContent value="deadline" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-amber-500" />
-                  Smart Deadline Manager
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Project</label>
-                  <Select value={deadlineProjectId} onValueChange={(v) => setDeadlineProjectId(v)}>
-                    <SelectTrigger className="h-9 w-full sm:w-64">
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {error}
-                  </p>
-                )}
-
-                <Button
-                  onClick={handleDeadlineAnalyze}
-                  disabled={loading || !deadlineProjectId}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      Analyze Timeline
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Overdue tasks */}
-            {deadlineProjectId && overdueTasks.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    Overdue Tasks ({overdueTasks.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {overdueTasks.map((task) => (
-                      <button
-                        key={task.id}
-                        onClick={() => navigate('task-detail', { id: task.id })}
-                        className="w-full text-left p-2.5 rounded-lg border border-red-200 dark:border-red-900/30 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                          <span className="text-sm font-medium truncate">{task.title}</span>
-                          <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 dark:text-red-400 shrink-0">
-                            {task.status.replace(/_/g, ' ')}
-                          </Badge>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* AI deadline response */}
-            {deadlineResponse && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-amber-500" />
-                    AI Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                      {deadlineResponse}
+                  <div>
+                    <h2 className="text-xl font-semibold">{modeConfig?.label}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {modeConfig?.description} — ask anything about your project
                     </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Suggested prompts */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {SUGGESTED_PROMPTS[activeMode].map((prompt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSuggestionClick(prompt)}
+                      className="flex items-center gap-2.5 p-3 rounded-xl border bg-card hover:bg-accent/50 text-left transition-colors group"
+                    >
+                      <div className={cn(
+                        'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                        'bg-muted group-hover:bg-primary/10 transition-colors'
+                      )}>
+                        {i === 0 && <Zap className="h-4 w-4 text-muted-foreground group-hover:text-primary" />}
+                        {i === 1 && <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-primary" />}
+                        {i === 2 && <BookOpen className="h-4 w-4 text-muted-foreground group-hover:text-primary" />}
+                        {i === 3 && <Lightbulb className="h-4 w-4 text-muted-foreground group-hover:text-primary" />}
+                      </div>
+                      <span className="text-xs text-muted-foreground group-hover:text-foreground line-clamp-2 transition-colors">
+                        {prompt}
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick stats */}
+                {selectedProjectId && tasks.length > 0 && (
+                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> {tasks.length} tasks
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {tasks.filter((t) => t.status === 'completed').length} completed
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          {hasMessages && (
+            <div className="py-4 space-y-1">
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id} message={msg} mode={activeMode} />
+              ))}
+              {loading && <TypingIndicator />}
+            </div>
+          )}
+
+          {/* Loading with no messages */}
+          {!hasMessages && loading && <TypingIndicator />}
+        </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollDown && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 h-8 w-8 rounded-full bg-background border shadow-lg flex items-center justify-center hover:bg-accent transition-colors z-10"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* ==================== INPUT AREA ==================== */}
+      <div className="border-t bg-card px-4 py-3 shrink-0">
+        {error && (
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <span className="text-xs text-destructive">{error}</span>
+            <button onClick={() => setError(null)} className="text-xs text-muted-foreground hover:text-foreground">
+              Dismiss
+            </button>
+          </div>
+        )}
+        <div className="flex items-end gap-2 max-w-4xl mx-auto">
+          <div className="flex-1 relative">
+            <Textarea
+              ref={inputRef}
+              placeholder={
+                activeMode === 'code'
+                  ? 'Ask for code help...'
+                  : activeMode === 'bug'
+                    ? 'Describe the bug you are facing...'
+                    : activeMode === 'docs'
+                      ? 'What documentation do you need?'
+                      : 'Ask about your timeline...'
+              }
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              rows={1}
+              className="min-h-[44px] max-h-[120px] resize-none pr-12 rounded-xl"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend()
+              }}
+            />
+          </div>
+          <Button
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+            className="h-11 w-11 rounded-xl shrink-0 p-0"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
             )}
-          </TabsContent>
-        </Tabs>
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+          Press <kbd className="px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Ctrl+Enter</kbd> to send · AI can make mistakes
+        </p>
       </div>
     </div>
   )
