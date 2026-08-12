@@ -410,3 +410,34 @@ Stage Summary:
 - All 18+ pages, 28+ API routes, 23+ DB models working correctly
 - Zero errors in console, ESLint, and TypeScript
 - Application is production-ready
+
+---
+Task ID: 11
+Agent: Main Orchestrator
+Task: Visual and functional enhancements - Auth redesign, Dashboard upgrade, WebSocket notifications, Onboarding UX
+
+Work Log:
+- Generated AI hero illustration (neural network visualization) for auth page
+- Redesigned auth/landing page: split layout with dark branded left panel (features, stats, hero image) and clean right panel (forms)
+  - Login view: 4 feature cards, "Build projects smarter, not harder" headline
+  - Signup view: all 6 features with checkmarks, "Your AI project companion awaits" headline
+  - Mobile responsive: left panel hidden, centered card on small screens
+- Enhanced dashboard page:
+  - Added ProgressRing SVG component (color-coded by progress percentage)
+  - Replaced stat cards with gradient backgrounds, uppercase labels, and hover effects
+  - Added AI Insights Banner with context-aware tips (overdue, momentum, all-on-track)
+  - Added pie chart for task distribution
+  - Added Next Deadline card with days-remaining and progress bar
+  - Improved project cards with ProgressRing, days-left labels, and type badges
+- Created WebSocket notification mini-service (port 3004)
+- Created useRealtimeNotifications hook (callback-based, lint-compliant)
+- Integrated real-time notification toast in AppShell (bottom-right popup)
+- Enhanced onboarding page with animated progress bar and saving state
+- Installed socket.io-client for frontend WebSocket support
+
+Stage Summary:
+- 4 files significantly rewritten (auth-pages, dashboard, onboarding, app-shell)
+- 1 new mini-service (notification-service on port 3004)
+- 1 new hook (useRealtimeNotifications)
+- Zero ESLint errors, zero console errors
+- Full browser verification completed

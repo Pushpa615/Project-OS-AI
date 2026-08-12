@@ -1,0 +1,708 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useMemo } from 'react'
+     4→import {
+     5→  Plus,
+     6→  CheckCircle,
+     7→  AlertTriangle,
+     8→  Clock,
+     9→  Calendar,
+    10→  Zap,
+    11→  Activity,
+    12→  ChevronRight,
+    13→  FolderOpen,
+    14→  Brain,
+    15→  BarChart3,
+    16→  Bell,
+    17→  ClipboardCheck,
+    18→  TrendingUp,
+    19→} from 'lucide-react'
+    20→import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+    21→import { Button } from '@/components/ui/button'
+    22→import { Badge } from '@/components/ui/badge'
+    23→import { Progress } from '@/components/ui/progress'
+    24→import { Skeleton } from '@/components/ui/skeleton'
+    25→import { useNavStore } from '@/lib/nav-store'
+    26→import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+    27→
+    28→// ==================== TYPES ====================
+    29→
+    30→interface DashboardUser {
+    31→  id: string
+    32→  email: string
+    33→  name: string
+    34→  role: string
+    35→}
+    36→
+    37→interface Project {
+    38→  id: string
+    39→  name: string
+    40→  description: string
+    41→  status: string
+    42→  progress: number
+    43→  deadline: string | null
+    44→  projectType: string
+    45→  _count: { tasks: number }
+    46→  milestones: { id: string; title: string; status: string; progress: number }[]
+    47→}
+    48→
+    49→interface Task {
+    50→  id: string
+    51→  title: string
+    52→  status: string
+    53→  priority: string
+    54→  dueDate: string | null
+    55→  projectId: string
+    56→}
+    57→
+    58→interface Notification {
+    59→  id: string
+    60→  title: string
+    61→  message: string
+    62→  type: string
+    63→  createdAt: string
+    64→  read: boolean
+    65→}
+    66→
+    67→// ==================== HELPERS ====================
+    68→
+    69→function formatDate(dateStr: string | null): string {
+    70→  if (!dateStr) return 'No deadline'
+    71→  try {
+    72→    return new Date(dateStr).toLocaleDateString('en-US', {
+    73→      month: 'short',
+    74→      day: 'numeric',
+    75→      year: 'numeric',
+    76→    })
+    77→  } catch {
+    78→    return 'Invalid date'
+    79→  }
+    80→}
+    81→
+    82→function formatRelativeTime(dateStr: string): string {
+    83→  try {
+    84→    const date = new Date(dateStr)
+    85→    const now = new Date()
+    86→    const diffMs = now.getTime() - date.getTime()
+    87→    const diffMins = Math.floor(diffMs / 60000)
+    88→    if (diffMins < 1) return 'Just now'
+    89→    if (diffMins < 60) return `${diffMins}m ago`
+    90→    const diffHours = Math.floor(diffMins / 60)
+    91→    if (diffHours < 24) return `${diffHours}h ago`
+    92→    const diffDays = Math.floor(diffHours / 24)
+    93→    if (diffDays < 7) return `${diffDays}d ago`
+    94→    return formatDate(dateStr)
+    95→  } catch {
+    96→    return ''
+    97→  }
+    98→}
+    99→
+   100→function getStatusColor(status: string) {
+   101→  switch (status) {
+   102→    case 'in_progress':
+   103→      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+   104→    case 'completed':
+   105→    case 'verified_completed':
+   106→      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+   107→    case 'not_started':
+   108→      return 'bg-muted text-muted-foreground border-border'
+   109→    case 'on_hold':
+   110→      return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20'
+   111→    case 'overdue':
+   112→      return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20'
+   113→    default:
+   114→      return 'bg-muted text-muted-foreground border-border'
+   115→  }
+   116→}
+   117→
+   118→function getPriorityColor(priority: string) {
+   119→  switch (priority) {
+   120→    case 'critical':
+   121→      return 'bg-red-500/10 text-red-700 dark:text-red-400'
+   122→    case 'high':
+   123→      return 'bg-orange-500/10 text-orange-700 dark:text-orange-400'
+   124→    case 'medium':
+   125→      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+   126→    case 'low':
+   127→      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+   128→    default:
+   129→      return 'bg-muted text-muted-foreground'
+   130→  }
+   131→}
+   132→
+   133→function isOverdue(dateStr: string | null): boolean {
+   134→  if (!dateStr) return false
+   135→  try {
+   136→    return new Date(dateStr) < new Date()
+   137→  } catch {
+   138→    return false
+   139→  }
+   140→}
+   141→
+   142→// ==================== SKELETON COMPONENTS ====================
+   143→
+   144→function StatsSkeleton() {
+   145→  return (
+   146→    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   147→      {Array.from({ length: 4 }).map((_, i) => (
+   148→        <Card key={i}>
+   149→          <CardContent className="p-4">
+   150→            <div className="flex items-center justify-between mb-3">
+   151→              <Skeleton className="h-4 w-20" />
+   152→              <Skeleton className="h-8 w-8 rounded-lg" />
+   153→            </div>
+   154→            <Skeleton className="h-8 w-12 mb-1" />
+   155→            <Skeleton className="h-3 w-16" />
+   156→          </CardContent>
+   157→        </Card>
+   158→      ))}
+   159→    </div>
+   160→  )
+   161→}
+   162→
+   163→function ProjectCardSkeleton() {
+   164→  return (
+   165→    <Card>
+   166→      <CardContent className="p-4">
+   167→        <div className="flex items-start justify-between mb-3">
+   168→          <div className="space-y-2">
+   169→            <Skeleton className="h-5 w-40" />
+   170→            <Skeleton className="h-3 w-24" />
+   171→          </div>
+   172→          <Skeleton className="h-5 w-16 rounded-full" />
+   173→        </div>
+   174→        <Skeleton className="h-2 w-full mb-2" />
+   175→        <div className="flex justify-between">
+   176→          <Skeleton className="h-3 w-16" />
+   177→          <Skeleton className="h-3 w-24" />
+   178→        </div>
+   179→      </CardContent>
+   180→    </Card>
+   181→  )
+   182→}
+   183→
+   184→function ActivitySkeleton() {
+   185→  return (
+   186→    <div className="space-y-3">
+   187→      {Array.from({ length: 4 }).map((_, i) => (
+   188→        <div key={i} className="flex items-center gap-3">
+   189→          <Skeleton className="h-8 w-8 rounded-full" />
+   190→          <div className="flex-1 space-y-1">
+   191→            <Skeleton className="h-4 w-full" />
+   192→            <Skeleton className="h-3 w-20" />
+   193→          </div>
+   194→        </div>
+   195→      ))}
+   196→    </div>
+   197→  )
+   198→}
+   199→
+   200→// ==================== MAIN COMPONENT ====================
+   201→
+   202→interface DashboardPageProps {
+   203→  user: DashboardUser
+   204→}
+   205→
+   206→export function DashboardPage({ user }: DashboardPageProps) {
+   207→  const navigate = useNavStore((s) => s.navigate)
+   208→
+   209→  // Data states
+   210→  const [projects, setProjects] = useState<Project[]>([])
+   211→  const [overdueTasks, setOverdueTasks] = useState<Task[]>([])
+   212→  const [notStartedTasks, setNotStartedTasks] = useState<Task[]>([])
+   213→  const [completedTasks, setCompletedTasks] = useState<Task[]>([])
+   214→  const [notifications, setNotifications] = useState<Notification[]>([])
+   215→  const [unreadCount, setUnreadCount] = useState(0)
+   216→
+   217→  // Loading state
+   218→  const [loading, setLoading] = useState(true)
+   219→
+   220→  // Today info
+   221→  const today = new Date()
+   222→  const greeting =
+   223→    today.getHours() < 12
+   224→      ? 'Good morning'
+   225→      : today.getHours() < 18
+   226→      ? 'Good afternoon'
+   227→      : 'Good evening'
+   228→  const dateStr = today.toLocaleDateString('en-US', {
+   229→    weekday: 'long',
+   230→    month: 'long',
+   231→    day: 'numeric',
+   232→    year: 'numeric',
+   233→  })
+   234→
+   235→  // Fetch all data
+   236→  useEffect(() => {
+   237→    async function fetchData() {
+   238→      setLoading(true)
+   239→      try {
+   240→        const userId = user.id
+   241→
+   242→        // Fetch projects
+   243→        const [projectsRes, overdueRes, notStartedRes, completedRes, notifsRes] =
+   244→          await Promise.allSettled([
+   245→            fetch(`/api/projects?userId=${userId}`).then((r) => r.json()),
+   246→            fetch(`/api/tasks?assignedTo=${userId}&status=overdue`).then((r) => r.json()),
+   247→            fetch(`/api/tasks?assignedTo=${userId}&status=not_started`).then((r) => r.json()),
+   248→            fetch(`/api/tasks?assignedTo=${userId}&status=completed`).then((r) => r.json()),
+   249→            fetch(`/api/notifications?userId=${userId}&unread=true`).then((r) => r.json()),
+   250→          ])
+   251→
+   252→        if (projectsRes.status === 'fulfilled' && projectsRes.value.data) {
+   253→          setProjects(projectsRes.value.data)
+   254→        }
+   255→        if (overdueRes.status === 'fulfilled' && overdueRes.value.data) {
+   256→          setOverdueTasks(overdueRes.value.data)
+   257→        }
+   258→        if (notStartedRes.status === 'fulfilled' && notStartedRes.value.data) {
+   259→          setNotStartedTasks(notStartedRes.value.data)
+   260→        }
+   261→        if (completedRes.status === 'fulfilled' && completedRes.value.data) {
+   262→          setCompletedTasks(completedRes.value.data)
+   263→        }
+   264→        if (notifsRes.status === 'fulfilled') {
+   265→          setNotifications(notifsRes.value.data || [])
+   266→          setUnreadCount(notifsRes.value.unreadCount || 0)
+   267→        }
+   268→      } catch (err) {
+   269→        console.error('Dashboard fetch error:', err)
+   270→      } finally {
+   271→        setLoading(false)
+   272→      }
+   273→    }
+   274→    fetchData()
+   275→  }, [user.id])
+   276→
+   277→  // Compute stats
+   278→  const activeProjects = projects.filter(
+   279→    (p) => p.status !== 'completed' && p.status !== 'archived'
+   280→  )
+   281→  const totalTasks = projects.reduce((acc, p) => acc + p._count.tasks, 0)
+   282→  const allTasks = [...overdueTasks, ...notStartedTasks, ...completedTasks]
+   283→  const tasksDueToday = allTasks.filter(
+   284→    (t) =>
+   285→      t.dueDate &&
+   286→      new Date(t.dueDate).toDateString() === today.toDateString() &&
+   287→      t.status !== 'completed' &&
+   288→      t.status !== 'verified_completed'
+   289→  )
+   290→
+   291→  // Chart data: last 7 days completed tasks
+   292→  const chartData = useMemo(() =>
+   293→    Array.from({ length: 7 }).map((_, i) => {
+   294→      const d = new Date()
+   295→      d.setDate(d.getDate() - (6 - i))
+   296→      return {
+   297→        day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+   298→        tasks: completedTasks.filter(t => {
+   299→          if (!t.dueDate) return false
+   300→          const td = new Date(t.dueDate)
+   301→          return td.toDateString() === d.toDateString() && td <= new Date()
+   302→        }).length,
+   303→      }
+   304→    })
+   305→  , [completedTasks])
+   306→
+   307→  // Recent notifications as activity
+   308→  const recentActivity = notifications.slice(0, 5)
+   309→
+   310→  return (
+   311→    <div className="min-h-screen bg-background">
+   312→      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+   313→        {/* Welcome Header */}
+   314→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   315→          <div>
+   316→            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+   317→              {greeting}, {user.name || 'there'}!
+   318→            </h1>
+   319→            <p className="text-muted-foreground mt-1">{dateStr}</p>
+   320→          </div>
+   321→          <div className="flex items-center gap-2">
+   322→            <Button
+   323→              variant="outline"
+   324→              className="relative"
+   325→              onClick={() => navigate('notifications')}
+   326→            >
+   327→              <Bell className="h-4 w-4 mr-2" />
+   328→              Notifications
+   329→              {unreadCount > 0 && (
+   330→                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+   331→                  {unreadCount > 9 ? '9+' : unreadCount}
+   332→                </span>
+   333→              )}
+   334→            </Button>
+   335→          </div>
+   336→        </div>
+   337→
+   338→        {loading ? (
+   339→          <>
+   340→            <StatsSkeleton />
+   341→            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   342→              <div className="lg:col-span-2 space-y-6">
+   343→                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   344→                  {Array.from({ length: 4 }).map((_, i) => (
+   345→                    <ProjectCardSkeleton key={i} />
+   346→                  ))}
+   347→                </div>
+   348→              </div>
+   349→              <div className="space-y-6">
+   350→                <Skeleton className="h-64 w-full rounded-xl" />
+   351→                <Skeleton className="h-64 w-full rounded-xl" />
+   352→              </div>
+   353→            </div>
+   354→          </>
+   355→        ) : (
+   356→          <>
+   357→            {/* Stats Cards */}
+   358→            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   359→              <Card>
+   360→                <CardContent className="p-4">
+   361→                  <div className="flex items-center justify-between mb-3">
+   362→                    <span className="text-sm text-muted-foreground">Active Projects</span>
+   363→                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+   364→                      <FolderOpen className="h-4 w-4 text-primary" />
+   365→                    </div>
+   366→                  </div>
+   367→                  <p className="text-2xl font-bold">{activeProjects.length}</p>
+   368→                  <p className="text-xs text-muted-foreground mt-1">
+   369→                    {totalTasks} total tasks
+   370→                  </p>
+   371→                </CardContent>
+   372→              </Card>
+   373→
+   374→              <Card>
+   375→                <CardContent className="p-4">
+   376→                  <div className="flex items-center justify-between mb-3">
+   377→                    <span className="text-sm text-muted-foreground">Due Today</span>
+   378→                    <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+   379→                      <Clock className="h-4 w-4 text-amber-500" />
+   380→                    </div>
+   381→                  </div>
+   382→                  <p className="text-2xl font-bold">{tasksDueToday.length}</p>
+   383→                  <p className="text-xs text-muted-foreground mt-1">
+   384→                    {notStartedTasks.length} not started
+   385→                  </p>
+   386→                </CardContent>
+   387→              </Card>
+   388→
+   389→              <Card>
+   390→                <CardContent className="p-4">
+   391→                  <div className="flex items-center justify-between mb-3">
+   392→                    <span className="text-sm text-muted-foreground">Overdue</span>
+   393→                    <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+   394→                      <AlertTriangle className="h-4 w-4 text-red-500" />
+   395→                    </div>
+   396→                  </div>
+   397→                  <p className="text-2xl font-bold">{overdueTasks.length}</p>
+   398→                  <p className="text-xs text-muted-foreground mt-1">
+   399→                    {overdueTasks.length > 0 ? 'Needs attention' : 'All on track'}
+   400→                  </p>
+   401→                </CardContent>
+   402→              </Card>
+   403→
+   404→              <Card>
+   405→                <CardContent className="p-4">
+   406→                  <div className="flex items-center justify-between mb-3">
+   407→                    <span className="text-sm text-muted-foreground">Completed</span>
+   408→                    <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+   409→                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+   410→                    </div>
+   411→                  </div>
+   412→                  <p className="text-2xl font-bold">{completedTasks.length}</p>
+   413→                  <p className="text-xs text-muted-foreground mt-1">
+   414→                    {totalTasks > 0
+   415→                      ? `${Math.round((completedTasks.length / totalTasks) * 100)}% completion`
+   416→                      : 'No tasks yet'}
+   417→                  </p>
+   418→                </CardContent>
+   419→              </Card>
+   420→            </div>
+   421→
+   422→            {/* Main Content Grid */}
+   423→            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   424→              {/* Left Column: Projects + Activity */}
+   425→              <div className="lg:col-span-2 space-y-6">
+   426→                {/* Quick Actions */}
+   427→                <Card>
+   428→                  <CardHeader className="pb-3">
+   429→                    <CardTitle className="text-lg flex items-center gap-2">
+   430→                      <Zap className="h-5 w-5 text-primary" />
+   431→                      Quick Actions
+   432→                    </CardTitle>
+   433→                  </CardHeader>
+   434→                  <CardContent className="pb-4">
+   435→                    <div className="flex flex-wrap gap-3">
+   436→                      <Button onClick={() => navigate('create-project')}>
+   437→                        <Plus className="h-4 w-4 mr-2" />
+   438→                        Create Project
+   439→                      </Button>
+   440→                      <Button variant="outline" onClick={() => navigate('checkin')}>
+   441→                        <ClipboardCheck className="h-4 w-4 mr-2" />
+   442→                        Daily Check-in
+   443→                      </Button>
+   444→                      <Button variant="outline" onClick={() => navigate('tasks')}>
+   445→                        <Activity className="h-4 w-4 mr-2" />
+   446→                        View All Tasks
+   447→                      </Button>
+   448→                      <Button variant="outline" onClick={() => navigate('calendar')}>
+   449→                        <Calendar className="h-4 w-4 mr-2" />
+   450→                        Calendar
+   451→                      </Button>
+   452→                    </div>
+   453→                  </CardContent>
+   454→                </Card>
+   455→
+   456→                {/* AI Recommendations */}
+   457→                <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+   458→                  <CardContent className="p-6">
+   459→                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+   460→                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+   461→                        <Brain className="h-6 w-6 text-primary" />
+   462→                      </div>
+   463→                      <div className="flex-1">
+   464→                        <h3 className="font-semibold mb-1">AI-Powered Recommendations</h3>
+   465→                        <p className="text-sm text-muted-foreground">
+   466→                          Get personalized insights on task prioritization, project progress, and team collaboration.
+   467→                        </p>
+   468→                      </div>
+   469→                      <Button onClick={() => navigate('ai-assistant')}>
+   470→                        <Brain className="h-4 w-4 mr-2" />
+   471→                        Get AI Suggestions
+   472→                      </Button>
+   473→                    </div>
+   474→                  </CardContent>
+   475→                </Card>
+   476→
+   477→                {/* Project Overview */}
+   478→                <div>
+   479→                  <div className="flex items-center justify-between mb-4">
+   480→                    <h2 className="text-lg font-semibold flex items-center gap-2">
+   481→                      <FolderOpen className="h-5 w-5" />
+   482→                      Your Projects
+   483→                    </h2>
+   484→                    <Button variant="ghost" size="sm" onClick={() => navigate('projects')}>
+   485→                      View all
+   486→                      <ChevronRight className="ml-1 h-4 w-4" />
+   487→                    </Button>
+   488→                  </div>
+   489→
+   490→                  {projects.length === 0 ? (
+   491→                    <Card>
+   492→                      <CardContent className="p-8 text-center">
+   493→                        <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+   494→                        <h3 className="font-semibold mb-1">No projects yet</h3>
+   495→                        <p className="text-sm text-muted-foreground mb-4">
+   496→                          Create your first project to get started
+   497→                        </p>
+   498→                        <Button onClick={() => navigate('create-project')}>
+   499→                          <Plus className="h-4 w-4 mr-2" />
+   500→                          Create Project
+   501→                        </Button>
+   502→                      </CardContent>
+   503→                    </Card>
+   504→                  ) : (
+   505→                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   506→                      {projects.slice(0, 4).map((project) => (
+   507→                        <Card
+   508→                          key={project.id}
+   509→                          className="cursor-pointer hover:shadow-md transition-shadow"
+   510→                          onClick={() => navigate('project-detail', { id: project.id })}
+   511→                        >
+   512→                          <CardContent className="p-4">
+   513→                            <div className="flex items-start justify-between mb-3">
+   514→                              <div className="flex-1 min-w-0">
+   515→                                <h3 className="font-semibold text-sm truncate">{project.name}</h3>
+   516→                                <p className="text-xs text-muted-foreground mt-0.5">{project.projectType}</p>
+   517→                              </div>
+   518→                              <Badge
+   519→                                variant="outline"
+   520→                                className={`ml-2 shrink-0 text-xs ${getStatusColor(project.status)}`}
+   521→                              >
+   522→                                {project.status.replace(/_/g, ' ')}
+   523→                              </Badge>
+   524→                            </div>
+   525→                            <Progress value={project.progress} className="h-1.5 mb-2" />
+   526→                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+   527→                              <span>{project._count.tasks} tasks</span>
+   528→                              {project.deadline && (
+   529→                                <span className={isOverdue(project.deadline) ? 'text-red-500' : ''}>
+   530→                                  {formatDate(project.deadline)}
+   531→                                </span>
+   532→                              )}
+   533→                            </div>
+   534→                          </CardContent>
+   535→                        </Card>
+   536→                      ))}
+   537→                    </div>
+   538→                  )}
+   539→                </div>
+   540→
+   541→                {/* Task Completion Chart */}
+   542→                <Card>
+   543→                  <CardHeader className="pb-2">
+   544→                    <CardTitle className="text-lg flex items-center gap-2">
+   545→                      <BarChart3 className="h-5 w-5" />
+   546→                      Task Completion
+   547→                    </CardTitle>
+   548→                    <CardDescription>Tasks completed over the last 7 days</CardDescription>
+   549→                  </CardHeader>
+   550→                  <CardContent className="pb-4">
+   551→                    <div className="h-48">
+   552→                      <ResponsiveContainer width="100%" height="100%">
+   553→                        <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+   554→                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+   555→                          <XAxis dataKey="day" className="text-xs" tick={{ fontSize: 12 }} />
+   556→                          <YAxis className="text-xs" tick={{ fontSize: 12 }} allowDecimals={false} />
+   557→                          <Tooltip
+   558→                            contentStyle={{
+   559→                              backgroundColor: 'hsl(var(--card))',
+   560→                              border: '1px solid hsl(var(--border))',
+   561→                              borderRadius: '8px',
+   562→                              fontSize: '12px',
+   563→                            }}
+   564→                          />
+   565→                          <Bar
+   566→                            dataKey="tasks"
+   567→                            fill="hsl(var(--primary))"
+   568→                            radius={[4, 4, 0, 0]}
+   569→                            maxBarSize={40}
+   570→                          />
+   571→                        </BarChart>
+   572→                      </ResponsiveContainer>
+   573→                    </div>
+   574→                  </CardContent>
+   575→                </Card>
+   576→              </div>
+   577→
+   578→              {/* Right Column: Activity + Overdue */}
+   579→              <div className="space-y-6">
+   580→                {/* Recent Activity */}
+   581→                <Card>
+   582→                  <CardHeader className="pb-3">
+   583→                    <CardTitle className="text-lg flex items-center gap-2">
+   584→                      <Activity className="h-5 w-5" />
+   585→                      Recent Activity
+   586→                    </CardTitle>
+   587→                  </CardHeader>
+   588→                  <CardContent className="pb-4">
+   589→                    {recentActivity.length === 0 ? (
+   590→                      <div className="text-center py-6">
+   591→                        <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+   592→                        <p className="text-sm text-muted-foreground">No recent activity</p>
+   593→                      </div>
+   594→                    ) : (
+   595→                      <div className="space-y-3 max-h-80 overflow-y-auto">
+   596→                        {recentActivity.map((notif) => (
+   597→                          <div key={notif.id} className="flex items-start gap-3">
+   598→                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+   599→                              <Bell className="h-3.5 w-3.5 text-primary" />
+   600→                            </div>
+   601→                            <div className="flex-1 min-w-0">
+   602→                              <p className="text-sm font-medium truncate">{notif.title}</p>
+   603→                              <p className="text-xs text-muted-foreground truncate">{notif.message}</p>
+   604→                              <p className="text-xs text-muted-foreground mt-0.5">
+   605→                                {formatRelativeTime(notif.createdAt)}
+   606→                              </p>
+   607→                            </div>
+   608→                          </div>
+   609→                        ))}
+   610→                      </div>
+   611→                    )}
+   612→                  </CardContent>
+   613→                </Card>
+   614→
+   615→                {/* Overdue Tasks */}
+   616→                <Card>
+   617→                  <CardHeader className="pb-3">
+   618→                    <CardTitle className="text-lg flex items-center gap-2">
+   619→                      <AlertTriangle className="h-5 w-5 text-red-500" />
+   620→                      Overdue Tasks
+   621→                    </CardTitle>
+   622→                  </CardHeader>
+   623→                  <CardContent className="pb-4">
+   624→                    {overdueTasks.length === 0 ? (
+   625→                      <div className="text-center py-6">
+   626→                        <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
+   627→                        <p className="text-sm text-muted-foreground">No overdue tasks</p>
+   628→                      </div>
+   629→                    ) : (
+   630→                      <div className="space-y-3 max-h-80 overflow-y-auto">
+   631→                        {overdueTasks.slice(0, 5).map((task) => (
+   632→                          <div
+   633→                            key={task.id}
+   634→                            className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+   635→                            onClick={() => navigate('task-detail', { id: task.id })}
+   636→                          >
+   637→                            <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+   638→                            <div className="flex-1 min-w-0">
+   639→                              <p className="text-sm font-medium truncate">{task.title}</p>
+   640→                              <div className="flex items-center gap-2 mt-1">
+   641→                                <Badge
+   642→                                  variant="outline"
+   643→                                  className={`text-xs ${getPriorityColor(task.priority)}`}
+   644→                                >
+   645→                                  {task.priority}
+   646→                                </Badge>
+   647→                                {task.dueDate && (
+   648→                                  <span className="text-xs text-red-500">
+   649→                                    {formatDate(task.dueDate)}
+   650→                                  </span>
+   651→                                )}
+   652→                              </div>
+   653→                            </div>
+   654→                            <ChevronRight className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+   655→                          </div>
+   656→                        ))}
+   657→                      </div>
+   658→                    )}
+   659→                    {overdueTasks.length > 0 && (
+   660→                      <Button
+   661→                        variant="ghost"
+   662→                        size="sm"
+   663→                        className="w-full mt-2"
+   664→                        onClick={() => navigate('tasks')}
+   665→                      >
+   666→                        View all overdue
+   667→                        <ChevronRight className="ml-1 h-4 w-4" />
+   668→                      </Button>
+   669→                    )}
+   670→                  </CardContent>
+   671→                </Card>
+   672→
+   673→                {/* Quick Stats Summary */}
+   674→                <Card>
+   675→                  <CardHeader className="pb-3">
+   676→                    <CardTitle className="text-lg flex items-center gap-2">
+   677→                      <TrendingUp className="h-5 w-5" />
+   678→                      Summary
+   679→                    </CardTitle>
+   680→                  </CardHeader>
+   681→                  <CardContent className="pb-4 space-y-3">
+   682→                    <div className="flex items-center justify-between">
+   683→                      <span className="text-sm text-muted-foreground">Total Projects</span>
+   684→                      <span className="font-medium">{projects.length}</span>
+   685→                    </div>
+   686→                    <div className="flex items-center justify-between">
+   687→                      <span className="text-sm text-muted-foreground">Active Tasks</span>
+   688→                      <span className="font-medium">{allTasks.filter((t) => t.status === 'in_progress').length}</span>
+   689→                    </div>
+   690→                    <div className="flex items-center justify-between">
+   691→                      <span className="text-sm text-muted-foreground">Unread Notifications</span>
+   692→                      <span className="font-medium">{unreadCount}</span>
+   693→                    </div>
+   694→                    <div className="flex items-center justify-between">
+   695→                      <span className="text-sm text-muted-foreground">Overdue</span>
+   696→                      <span className="font-medium text-red-500">{overdueTasks.length}</span>
+   697→                    </div>
+   698→                  </CardContent>
+   699→                </Card>
+   700→              </div>
+   701→            </div>
+   702→          </>
+   703→        )}
+   704→      </main>
+   705→    </div>
+   706→  )
+   707→}
+   708→

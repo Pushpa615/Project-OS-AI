@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
+import { useRealtimeNotifications } from '@/lib/realtime-notifications'
+import { X } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -268,6 +270,14 @@ export function AppShell({
   const toggleSidebar = useNavStore((s) => s.toggleSidebar)
   const setSidebarOpen = useNavStore((s) => s.setSidebarOpen)
   const [notifCount, setNotifCount] = useState(0)
+  const [toast, setToast] = useState<{ title: string; message: string } | null>(null)
+
+  const handleNewNotification = useCallback((notification: { title: string; message: string }) => {
+    setNotifCount((c) => c + 1)
+    setToast({ title: notification.title, message: notification.message })
+  }, [])
+
+  useRealtimeNotifications(user.id, handleNewNotification)
 
   useEffect(() => {
     async function fetchNotifs() {
@@ -368,6 +378,27 @@ export function AppShell({
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+
+        {/* Real-time notification toast */}
+        {toast && (
+          <div className="fixed bottom-6 right-6 z-50 max-w-sm animate-in slide-in-from-bottom-5 fade-in-0 duration-300">
+            <div className="bg-card border shadow-lg rounded-xl p-4 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Bell className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{toast.title}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{toast.message}</p>
+              </div>
+              <button
+                onClick={() => setToast(null)}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

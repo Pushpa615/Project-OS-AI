@@ -106,46 +106,55 @@ interface OnboardingPageProps {
   onComplete: () => void
 }
 
-function StepIndicator({ currentStep }: { currentStep: number }) {
-  return (
-    <div className="flex items-center justify-center gap-2 mb-8">
-      {stepLabels.map((label, i) => {
-        const stepNum = i + 1
-        const isActive = stepNum === currentStep
-        const isCompleted = stepNum < currentStep
+function StepIndicator({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
+  const progress = ((currentStep - 1) / (totalSteps - 1)) * 100
 
-        return (
-          <div key={label} className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  isCompleted
-                    ? 'bg-primary text-primary-foreground'
-                    : isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {isCompleted ? <Check className="h-4 w-4" /> : stepNum}
+  return (
+    <div className="mb-8">
+      {/* Progress bar */}
+      <div className="h-1 w-full bg-muted rounded-full mb-6 overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* Step labels */}
+      <div className="flex items-center justify-center gap-2">
+        {stepLabels.map((label, i) => {
+          const stepNum = i + 1
+          const isActive = stepNum === currentStep
+          const isCompleted = stepNum < currentStep
+
+          return (
+            <div key={label} className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300 ${
+                    isCompleted
+                      ? 'bg-primary text-primary-foreground scale-100'
+                      : isActive
+                      ? 'bg-primary text-primary-foreground ring-4 ring-primary/20 scale-110'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {isCompleted ? <Check className="h-3.5 w-3.5" /> : stepNum}
+                </div>
+                <span
+                  className={`text-sm hidden sm:inline transition-colors ${
+                    isActive ? 'text-foreground font-semibold' : isCompleted ? 'text-primary font-medium' : 'text-muted-foreground'
+                  }`}
+                >
+                  {label}
+                </span>
               </div>
-              <span
-                className={`text-sm hidden sm:inline ${
-                  isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
-                }`}
-              >
-                {label}
-              </span>
+              {i < stepLabels.length - 1 && (
+                <div className="w-6 sm:w-12" />
+              )}
             </div>
-            {i < stepLabels.length - 1 && (
-              <div
-                className={`w-8 sm:w-16 h-0.5 transition-colors ${
-                  stepNum < currentStep ? 'bg-primary' : 'bg-muted'
-                }`}
-              />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -612,26 +621,38 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
     }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/40 p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
-      </div>
-
-      <div className="w-full max-w-2xl relative z-10">
-        {/* Header */}
-        <div className="text-center mb-2">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <Brain className="h-5 w-5 text-primary" />
-            <span className="font-bold text-lg">Project OS AI</span>
+  if (saving) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center space-y-4">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
+            <Brain className="h-8 w-8 text-primary" />
           </div>
+          <div>
+            <h2 className="text-xl font-bold">Setting up your workspace...</h2>
+            <p className="text-sm text-muted-foreground mt-1">This will only take a moment</p>
+          </div>
+          <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+            <Brain className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span className="font-bold">Project OS AI</span>
         </div>
 
-        <StepIndicator currentStep={step} />
+        <StepIndicator currentStep={step} totalSteps={3} />
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-6 sm:p-8">
             {step === 1 && <PersonalInfoStep onNext={handlePersonalInfoNext} />}
             {step === 2 && (
               <SkillsStep

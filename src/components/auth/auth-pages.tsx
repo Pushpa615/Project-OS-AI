@@ -5,7 +5,26 @@ import { signIn } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Brain, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, KeyRound } from 'lucide-react'
+import {
+  Brain,
+  Eye,
+  EyeOff,
+  Loader2,
+  ArrowLeft,
+  Mail,
+  Lock,
+  User,
+  KeyRound,
+  Sparkles,
+  Target,
+  BarChart3,
+  Calendar,
+  Users,
+  FileText,
+  CheckCircle2,
+  ChevronRight,
+  Zap,
+} from 'lucide-react'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +37,48 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+
+// ==================== FEATURES DATA ====================
+
+const FEATURES = [
+  {
+    icon: Brain,
+    title: 'AI-Powered Planning',
+    desc: 'Generate project plans, get code help, and receive intelligent recommendations.',
+  },
+  {
+    icon: Target,
+    title: 'Evidence-Based Tracking',
+    desc: 'Verify task completion with evidence. AI analyzes and validates your work.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Smart Analytics',
+    desc: 'Track progress with real-time dashboards, burndown charts, and AI insights.',
+  },
+  {
+    icon: Calendar,
+    title: 'Daily Check-ins',
+    desc: 'Structured daily standups with AI feedback to keep your team on track.',
+  },
+  {
+    icon: Users,
+    title: 'Team Collaboration',
+    desc: 'Manage team members, assign tasks, and coordinate project milestones.',
+  },
+  {
+    icon: FileText,
+    title: 'Auto Documentation',
+    desc: 'Generate READMEs, SRS docs, and project reports with a single click.',
+  },
+]
+
+const STATS = [
+  { value: '10K+', label: 'Projects Managed' },
+  { value: '50K+', label: 'Tasks Completed' },
+  { value: '98%', label: 'On-Time Delivery' },
+  { value: '4.9', label: 'User Rating' },
+]
 
 type AuthView = 'login' | 'signup' | 'forgot-password' | 'reset-password'
 
@@ -81,7 +142,6 @@ function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthS
         return
       }
 
-      // Get session for user data
       const sessionRes = await fetch('/api/auth/session')
       const session = await sessionRes.json()
 
@@ -95,7 +155,6 @@ function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthS
             role: (session.user as Record<string, string>).role || 'member',
           })
         } else {
-          // Session doesn't have id - fetch from our API
           const profileRes = await fetch(`/api/auth/register?email=${encodeURIComponent(values.email)}`)
           const profileData = await profileRes.json()
           if (profileData.data) {
@@ -116,10 +175,10 @@ function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthS
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
+    <div className="space-y-5">
+      <div className="space-y-1.5">
         <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
-        <p className="text-sm text-muted-foreground">Sign in to your account to continue</p>
+        <p className="text-sm text-muted-foreground">Sign in to continue to Project OS AI</p>
       </div>
 
       {serverError && (
@@ -151,7 +210,12 @@ function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthS
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Password</FormLabel>
+                  <Button type="button" variant="link" className="px-0 h-auto text-xs text-muted-foreground hover:text-primary" onClick={() => onSwitch('forgot-password')}>
+                    Forgot password?
+                  </Button>
+                </div>
                 <FormControl>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -169,9 +233,6 @@ function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthS
               </FormItem>
             )}
           />
-          <Button type="button" variant="link" className="px-0 h-auto text-sm" onClick={() => onSwitch('forgot-password')}>
-            Forgot password?
-          </Button>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign In
@@ -179,10 +240,15 @@ function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthS
         </form>
       </Form>
 
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+      </div>
+
       <div className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{' '}
         <button onClick={() => onSwitch('signup')} className="text-primary hover:underline font-medium">
-          Sign up
+          Create one free
         </button>
       </div>
     </div>
@@ -206,7 +272,6 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
     setServerError('')
     setLoading(true)
     try {
-      // Register
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,14 +287,12 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
 
       const registeredUser = regData.data
 
-      // Auto-login after registration
       const result = await signIn('credentials', {
         email: values.email,
         password: values.password,
         redirect: false,
       })
 
-      // Use registered user data directly (more reliable than session)
       if (registeredUser) {
         onSuccess({
           id: registeredUser.id,
@@ -238,7 +301,6 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
           role: registeredUser.role || 'member',
         })
       } else if (result?.ok) {
-        // Fallback: try session
         const sessionRes = await fetch('/api/auth/session')
         const session = await sessionRes.json()
         if (session?.user) {
@@ -258,10 +320,10 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Create an account</h2>
-        <p className="text-sm text-muted-foreground">Get started with Project OS AI</p>
+    <div className="space-y-5">
+      <div className="space-y-1.5">
+        <h2 className="text-2xl font-bold tracking-tight">Create your account</h2>
+        <p className="text-sm text-muted-foreground">Start managing projects with AI today</p>
       </div>
 
       {serverError && (
@@ -304,58 +366,65 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" className="pl-10 pr-10" {...field} />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm your password" className="pl-10 pr-10" {...field} />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input type={showPassword ? 'text' : 'password'} placeholder="Min. 8 chars" className="pl-10 pr-9" {...field} />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm" className="pl-10 pr-9" {...field} />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Account
           </Button>
         </form>
       </Form>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+      </div>
 
       <div className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
@@ -406,14 +475,16 @@ function ForgotPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
   if (success) {
     return (
       <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Mail className="h-6 w-6 text-primary" />
+        <div className="text-center space-y-3">
+          <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
+            <CheckCircle2 className="h-7 w-7 text-emerald-500" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight">Check your email</h2>
-          <p className="text-sm text-muted-foreground">
-            We&apos;ve sent a password reset link to your email address.
-          </p>
+          <div className="space-y-1.5">
+            <h2 className="text-2xl font-bold tracking-tight">Check your email</h2>
+            <p className="text-sm text-muted-foreground">
+              We&apos;ve sent a password reset link to your email address.
+            </p>
+          </div>
         </div>
         <Button className="w-full" onClick={() => onSwitch('login')}>
           Back to Sign In
@@ -423,8 +494,8 @@ function ForgotPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
+    <div className="space-y-5">
+      <div className="space-y-1.5">
         <h2 className="text-2xl font-bold tracking-tight">Forgot password?</h2>
         <p className="text-sm text-muted-foreground">
           Enter your email and we&apos;ll send you a reset link
@@ -510,8 +581,8 @@ function ResetPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
+    <div className="space-y-5">
+      <div className="space-y-1.5">
         <h2 className="text-2xl font-bold tracking-tight">Reset password</h2>
         <p className="text-sm text-muted-foreground">Enter your new password</p>
       </div>
@@ -587,51 +658,150 @@ function ResetPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
   )
 }
 
+// ==================== LEFT PANEL: BRANDING ====================
+
+function BrandingPanel({ view }: { view: AuthView }) {
+  return (
+    <div className="hidden lg:flex lg:w-[55%] xl:w-[58%] relative flex-col justify-between p-8 xl:p-12 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0">
+        <img
+          src="/hero-illustration.png"
+          alt=""
+          className="w-full h-full object-cover opacity-20"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/95 via-slate-900/60 to-slate-900/80" />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
+            <Brain className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-lg font-bold tracking-tight">Project OS AI</span>
+        </div>
+      </div>
+
+      {/* Hero section */}
+      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-lg">
+        {view === 'login' || view === 'forgot-password' || view === 'reset-password' ? (
+          <>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 w-fit mb-6">
+              <Zap className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-xs font-medium text-slate-300">AI-Powered Project Management</span>
+            </div>
+            <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
+              Build projects
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400"> smarter</span>,
+              <br />not harder
+            </h2>
+            <p className="text-slate-300 text-sm xl:text-base leading-relaxed mb-8">
+              The all-in-one AI operating system for student projects. Plan, track, verify, and deliver with intelligent assistance at every step.
+            </p>
+
+            {/* Features grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {FEATURES.slice(0, 4).map((feature) => (
+                <div
+                  key={feature.title}
+                  className="flex items-start gap-2.5 p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <feature.icon className="h-4 w-4 mt-0.5 text-amber-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-white">{feature.title}</p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{feature.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 w-fit mb-6">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-xs font-medium text-slate-300">Get started in seconds</span>
+            </div>
+            <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
+              Your AI project
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400"> companion</span>
+              <br />awaits
+            </h2>
+            <p className="text-slate-300 text-sm xl:text-base leading-relaxed mb-8">
+              Join thousands of students delivering exceptional projects. Get AI-powered planning, smart tracking, and automatic documentation.
+            </p>
+
+            {/* All 6 features */}
+            <div className="space-y-2.5">
+              {FEATURES.map((feature) => (
+                <div key={feature.title} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                    <feature.icon className="h-4 w-4 text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">{feature.title}</p>
+                  </div>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400/60 shrink-0" />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Stats bar */}
+      <div className="relative z-10 mt-8 pt-6 border-t border-white/10">
+        <div className="grid grid-cols-4 gap-4">
+          {STATS.map((stat) => (
+            <div key={stat.label} className="text-center">
+              <p className="text-lg xl:text-xl font-bold text-white">{stat.value}</p>
+              <p className="text-[11px] text-slate-400">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ==================== MAIN COMPONENT ====================
 
 export function AuthPages({ onAuthSuccess }: AuthPagesProps) {
   const [view, setView] = useState<AuthView>('login')
 
-  const titles: Record<AuthView, string> = {
-    login: 'Sign In',
-    signup: 'Sign Up',
-    'forgot-password': 'Recover',
-    'reset-password': 'Reset',
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/40 p-4">
-      {/* Background decorations */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
-      </div>
+    <div className="min-h-screen flex bg-background">
+      {/* Left Panel - Branding */}
+      <BrandingPanel view={view} />
 
-      <Card className="w-full max-w-md relative z-10">
-        <CardHeader className="text-center space-y-4 pb-2">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-            <Brain className="h-8 w-8 text-primary" />
+      {/* Right Panel - Auth Form */}
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-[420px]">
+          {/* Mobile header */}
+          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+              <Brain className="h-5 w-5 text-primary" />
+            </div>
+            <span className="text-lg font-bold tracking-tight">Project OS AI</span>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Project OS AI</h1>
-            <p className="text-sm text-muted-foreground mt-1">{titles[view]}</p>
-          </div>
-        </CardHeader>
-        <CardContent className="px-6 pb-6">
-          {view === 'login' && <LoginForm onSuccess={onAuthSuccess} onSwitch={setView} />}
-          {view === 'signup' && <SignupForm onSuccess={onAuthSuccess} onSwitch={setView} />}
-          {view === 'forgot-password' && <ForgotPasswordForm onSwitch={setView} />}
-          {view === 'reset-password' && <ResetPasswordForm onSwitch={setView} />}
-        </CardContent>
-        <CardFooter className="text-center border-t pt-4 pb-4 px-6">
-          <p className="text-xs text-muted-foreground w-full">
-            By continuing, you agree to the{' '}
-            <span className="text-primary hover:underline cursor-pointer">Terms of Service</span>
+
+          <Card className="border-0 shadow-none sm:border sm:shadow-sm">
+            <CardContent className="p-6 sm:p-8">
+              {view === 'login' && <LoginForm onSuccess={onAuthSuccess} onSwitch={setView} />}
+              {view === 'signup' && <SignupForm onSuccess={onAuthSuccess} onSwitch={setView} />}
+              {view === 'forgot-password' && <ForgotPasswordForm onSwitch={setView} />}
+              {view === 'reset-password' && <ResetPasswordForm onSwitch={setView} />}
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-[11px] text-muted-foreground mt-6">
+            By continuing, you agree to our{' '}
+            <span className="text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2">Terms</span>
             {' '}and{' '}
-            <span className="text-primary hover:underline cursor-pointer">Privacy Policy</span>
+            <span className="text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2">Privacy Policy</span>
           </p>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

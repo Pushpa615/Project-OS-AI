@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Plus,
-  CheckCircle,
+  CheckCircle2,
   AlertTriangle,
   Clock,
   Calendar,
@@ -16,6 +16,11 @@ import {
   Bell,
   ClipboardCheck,
   TrendingUp,
+  ArrowRight,
+  Sparkles,
+  Target,
+  ListChecks,
+  Play,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,7 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNavStore } from '@/lib/nav-store'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
 // ==================== TYPES ====================
 
@@ -62,6 +67,44 @@ interface Notification {
   type: string
   createdAt: string
   read: boolean
+}
+
+// ==================== PROGRESS RING ====================
+
+function ProgressRing({ value, size = 44, strokeWidth = 4, className = '' }: { value: number; size?: number; strokeWidth?: number; className?: string }) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+  const color = value >= 75 ? 'text-emerald-500' : value >= 40 ? 'text-amber-500' : 'text-red-400'
+
+  return (
+    <div className={`relative inline-flex items-center justify-center ${className}`}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-muted/30"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className={`${color} transition-all duration-700 ease-out`}
+        />
+      </svg>
+      <span className="absolute text-[10px] font-bold text-foreground">{Math.round(value)}%</span>
+    </div>
+  )
 }
 
 // ==================== HELPERS ====================
@@ -139,20 +182,26 @@ function isOverdue(dateStr: string | null): boolean {
   }
 }
 
+function getDaysUntil(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const diff = new Date(dateStr).getTime() - new Date().getTime()
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+}
+
 // ==================== SKELETON COMPONENTS ====================
 
 function StatsSkeleton() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i}>
-          <CardContent className="p-4">
+        <Card key={i} className="border-0 shadow-sm bg-gradient-to-br from-muted/50 to-muted/20">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-8 rounded-lg" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-9 w-9 rounded-xl" />
             </div>
             <Skeleton className="h-8 w-12 mb-1" />
-            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-20" />
           </CardContent>
         </Card>
       ))}
@@ -162,38 +211,52 @@ function StatsSkeleton() {
 
 function ProjectCardSkeleton() {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-40" />
+    <Card className="border-0 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between mb-4">
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-5 w-44" />
             <Skeleton className="h-3 w-24" />
           </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-10 w-10 rounded-full ml-3" />
         </div>
-        <Skeleton className="h-2 w-full mb-2" />
+        <Skeleton className="h-1.5 w-full mb-3" />
         <div className="flex justify-between">
-          <Skeleton className="h-3 w-16" />
-          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 w-28" />
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function ActivitySkeleton() {
+// ==================== STAT CARD ====================
+
+function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, onClick }: {
+  label: string
+  value: string | number
+  sub: string
+  icon: React.ElementType
+  iconBg: string
+  iconColor: string
+  onClick?: () => void
+}) {
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <div className="flex-1 space-y-1">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-3 w-20" />
+    <Card
+      className="border-0 shadow-sm bg-gradient-to-br from-muted/50 to-muted/20 hover:shadow-md transition-all cursor-pointer"
+      onClick={onClick}
+    >
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+          <div className={`h-9 w-9 rounded-xl ${iconBg} flex items-center justify-center`}>
+            <Icon className={`h-4 w-4 ${iconColor}`} />
           </div>
         </div>
-      ))}
-    </div>
+        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -238,8 +301,6 @@ export function DashboardPage({ user }: DashboardPageProps) {
       setLoading(true)
       try {
         const userId = user.id
-
-        // Fetch projects
         const [projectsRes, overdueRes, notStartedRes, completedRes, notifsRes] =
           await Promise.allSettled([
             fetch(`/api/projects?userId=${userId}`).then((r) => r.json()),
@@ -249,18 +310,10 @@ export function DashboardPage({ user }: DashboardPageProps) {
             fetch(`/api/notifications?userId=${userId}&unread=true`).then((r) => r.json()),
           ])
 
-        if (projectsRes.status === 'fulfilled' && projectsRes.value.data) {
-          setProjects(projectsRes.value.data)
-        }
-        if (overdueRes.status === 'fulfilled' && overdueRes.value.data) {
-          setOverdueTasks(overdueRes.value.data)
-        }
-        if (notStartedRes.status === 'fulfilled' && notStartedRes.value.data) {
-          setNotStartedTasks(notStartedRes.value.data)
-        }
-        if (completedRes.status === 'fulfilled' && completedRes.value.data) {
-          setCompletedTasks(completedRes.value.data)
-        }
+        if (projectsRes.status === 'fulfilled' && projectsRes.value.data) setProjects(projectsRes.value.data)
+        if (overdueRes.status === 'fulfilled' && overdueRes.value.data) setOverdueTasks(overdueRes.value.data)
+        if (notStartedRes.status === 'fulfilled' && notStartedRes.value.data) setNotStartedTasks(notStartedRes.value.data)
+        if (completedRes.status === 'fulfilled' && completedRes.value.data) setCompletedTasks(completedRes.value.data)
         if (notifsRes.status === 'fulfilled') {
           setNotifications(notifsRes.value.data || [])
           setUnreadCount(notifsRes.value.unreadCount || 0)
@@ -275,11 +328,10 @@ export function DashboardPage({ user }: DashboardPageProps) {
   }, [user.id])
 
   // Compute stats
-  const activeProjects = projects.filter(
-    (p) => p.status !== 'completed' && p.status !== 'archived'
-  )
+  const activeProjects = projects.filter((p) => p.status !== 'completed' && p.status !== 'archived')
   const totalTasks = projects.reduce((acc, p) => acc + p._count.tasks, 0)
   const allTasks = [...overdueTasks, ...notStartedTasks, ...completedTasks]
+  const inProgressTasks = allTasks.filter((t) => t.status === 'in_progress')
   const tasksDueToday = allTasks.filter(
     (t) =>
       t.dueDate &&
@@ -288,49 +340,111 @@ export function DashboardPage({ user }: DashboardPageProps) {
       t.status !== 'verified_completed'
   )
 
-  // Chart data: last 7 days completed tasks
-  const chartData = useMemo(() =>
-    Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date()
-      d.setDate(d.getDate() - (6 - i))
-      return {
-        day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        tasks: completedTasks.filter(t => {
-          if (!t.dueDate) return false
-          const td = new Date(t.dueDate)
-          return td.toDateString() === d.toDateString() && td <= new Date()
-        }).length,
-      }
-    })
-  , [completedTasks])
+  // Chart data
+  const chartData = useMemo(
+    () =>
+      Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() - (6 - i))
+        return {
+          day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          tasks: completedTasks.filter((t) => {
+            if (!t.dueDate) return false
+            const td = new Date(t.dueDate)
+            return td.toDateString() === d.toDateString() && td <= new Date()
+          }).length,
+        }
+      }),
+    [completedTasks]
+  )
 
-  // Recent notifications as activity
+  // Task distribution data for pie chart
+  const taskDistData = useMemo(() => {
+    const notStarted = allTasks.filter((t) => t.status === 'not_started').length
+    const inProgress = allTasks.filter((t) => t.status === 'in_progress').length
+    const completed = allTasks.filter((t) => t.status === 'completed' || t.status === 'verified_completed').length
+    const overdue = allTasks.filter((t) => t.status === 'overdue').length
+    return [
+      { name: 'Not Started', value: notStarted, color: 'hsl(var(--muted-foreground))' },
+      { name: 'In Progress', value: inProgress, color: 'hsl(45, 93%, 47%)' },
+      { name: 'Completed', value: completed, color: 'hsl(160, 84%, 39%)' },
+      { name: 'Overdue', value: overdue, color: 'hsl(0, 84%, 60%)' },
+    ].filter((d) => d.value > 0)
+  }, [allTasks])
+
   const recentActivity = notifications.slice(0, 5)
+
+  // AI tips based on data
+  const aiTips = useMemo(() => {
+    const tips: { icon: React.ElementType; title: string; desc: string; action?: () => void }[] = []
+    if (overdueTasks.length > 0) {
+      tips.push({
+        icon: AlertTriangle,
+        title: 'Overdue tasks need attention',
+        desc: `You have ${overdueTasks.length} overdue ${overdueTasks.length === 1 ? 'task' : 'tasks'}. Consider reprioritizing or extending deadlines.`,
+        action: () => navigate('tasks'),
+      })
+    }
+    if (notStartedTasks.length > 0 && inProgressTasks.length < 3) {
+      tips.push({
+        icon: Play,
+        title: 'Start more tasks',
+        desc: `${notStartedTasks.length} tasks are waiting. Focus on high-priority items first.`,
+        action: () => navigate('tasks'),
+      })
+    }
+    if (activeProjects.length > 0) {
+      const lowProgress = activeProjects.filter((p) => p.progress < 25)
+      if (lowProgress.length > 0) {
+        tips.push({
+          icon: Target,
+          title: `${lowProgress.length} ${lowProgress.length === 1 ? 'project' : 'projects'} need momentum`,
+          desc: 'Consider generating an AI plan or breaking down tasks into smaller steps.',
+          action: () => navigate('ai-assistant'),
+        })
+      }
+    }
+    if (tips.length === 0) {
+      tips.push({
+        icon: Sparkles,
+        title: 'All on track!',
+        desc: 'No urgent issues. Use AI Assistant for code help, documentation, or deadline planning.',
+        action: () => navigate('ai-assistant'),
+      })
+    }
+    return tips.slice(0, 2)
+  }, [overdueTasks, notStartedTasks, inProgressTasks, activeProjects, navigate])
+
+  const nextProject = activeProjects.sort((a, b) => {
+    if (!a.deadline) return 1
+    if (!b.deadline) return -1
+    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+  })[0]
 
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Welcome Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {greeting}, {user.name || 'there'}!
+            <p className="text-sm text-muted-foreground font-medium">{dateStr}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">
+              {greeting}, {user.name ? user.name.split(' ')[0] : 'there'}!
             </h1>
-            <p className="text-muted-foreground mt-1">{dateStr}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="relative"
-              onClick={() => navigate('notifications')}
-            >
+            <Button variant="outline" size="sm" className="relative" onClick={() => navigate('notifications')}>
               <Bell className="h-4 w-4 mr-2" />
               Notifications
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
+            </Button>
+            <Button size="sm" onClick={() => navigate('create-project')}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
             </Button>
           </div>
         </div>
@@ -340,270 +454,335 @@ export function DashboardPage({ user }: DashboardPageProps) {
             <StatsSkeleton />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <ProjectCardSkeleton key={i} />
-                  ))}
-                </div>
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <ProjectCardSkeleton key={i} />
+                ))}
               </div>
               <div className="space-y-6">
-                <Skeleton className="h-64 w-full rounded-xl" />
-                <Skeleton className="h-64 w-full rounded-xl" />
+                <Skeleton className="h-72 w-full rounded-xl" />
+                <Skeleton className="h-72 w-full rounded-xl" />
               </div>
             </div>
           </>
         ) : (
           <>
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-muted-foreground">Active Projects</span>
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <FolderOpen className="h-4 w-4 text-primary" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold">{activeProjects.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {totalTasks} total tasks
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <StatCard
+                label="Active Projects"
+                value={activeProjects.length}
+                sub={`${totalTasks} total tasks`}
+                icon={FolderOpen}
+                iconBg="bg-primary/10"
+                iconColor="text-primary"
+                onClick={() => navigate('projects')}
+              />
+              <StatCard
+                label="In Progress"
+                value={inProgressTasks.length}
+                sub={`${notStartedTasks.length} not started`}
+                icon={Play}
+                iconBg="bg-amber-500/10"
+                iconColor="text-amber-500"
+                onClick={() => navigate('tasks')}
+              />
+              <StatCard
+                label="Overdue"
+                value={overdueTasks.length}
+                sub={overdueTasks.length > 0 ? 'Needs attention' : 'All on track'}
+                icon={AlertTriangle}
+                iconBg="bg-red-500/10"
+                iconColor="text-red-500"
+                onClick={() => navigate('tasks')}
+              />
+              <StatCard
+                label="Completed"
+                value={completedTasks.length}
+                sub={totalTasks > 0 ? `${Math.round((completedTasks.length / totalTasks) * 100)}% completion` : 'No tasks yet'}
+                icon={CheckCircle2}
+                iconBg="bg-emerald-500/10"
+                iconColor="text-emerald-500"
+              />
+            </div>
 
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-muted-foreground">Due Today</span>
-                    <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                      <Clock className="h-4 w-4 text-amber-500" />
+            {/* AI Insights Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {aiTips.map((tip, i) => (
+                <Card key={i} className="border-primary/15 bg-gradient-to-r from-primary/[0.03] to-transparent hover:shadow-sm transition-shadow">
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                        <tip.icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm mb-1">{tip.title}</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{tip.desc}</p>
+                      </div>
+                      {tip.action && (
+                        <Button variant="ghost" size="sm" className="shrink-0" onClick={tip.action}>
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
-                  </div>
-                  <p className="text-2xl font-bold">{tasksDueToday.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {notStartedTasks.length} not started
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-muted-foreground">Overdue</span>
-                    <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold">{overdueTasks.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {overdueTasks.length > 0 ? 'Needs attention' : 'All on track'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-muted-foreground">Completed</span>
-                    <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                      <CheckCircle className="h-4 w-4 text-emerald-500" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold">{completedTasks.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {totalTasks > 0
-                      ? `${Math.round((completedTasks.length / totalTasks) * 100)}% completion`
-                      : 'No tasks yet'}
-                  </p>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Projects + Activity */}
+              {/* Left Column */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Quick Actions */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
-                      Quick Actions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <div className="flex flex-wrap gap-3">
-                      <Button onClick={() => navigate('create-project')}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Project
-                      </Button>
-                      <Button variant="outline" onClick={() => navigate('checkin')}>
-                        <ClipboardCheck className="h-4 w-4 mr-2" />
-                        Daily Check-in
-                      </Button>
-                      <Button variant="outline" onClick={() => navigate('tasks')}>
-                        <Activity className="h-4 w-4 mr-2" />
-                        View All Tasks
-                      </Button>
-                      <Button variant="outline" onClick={() => navigate('calendar')}>
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Calendar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* AI Recommendations */}
-                <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Brain className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold mb-1">AI-Powered Recommendations</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Get personalized insights on task prioritization, project progress, and team collaboration.
-                        </p>
-                      </div>
-                      <Button onClick={() => navigate('ai-assistant')}>
-                        <Brain className="h-4 w-4 mr-2" />
-                        Get AI Suggestions
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => navigate('checkin')}>
+                    <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
+                    Daily Check-in
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate('tasks')}>
+                    <ListChecks className="h-3.5 w-3.5 mr-1.5" />
+                    All Tasks
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate('calendar')}>
+                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                    Calendar
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate('ai-assistant')}>
+                    <Brain className="h-3.5 w-3.5 mr-1.5" />
+                    AI Assistant
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate('analytics')}>
+                    <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                    Analytics
+                  </Button>
+                </div>
 
                 {/* Project Overview */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                      <FolderOpen className="h-5 w-5" />
+                    <h2 className="text-base font-semibold flex items-center gap-2">
+                      <FolderOpen className="h-4 w-4" />
                       Your Projects
                     </h2>
                     <Button variant="ghost" size="sm" onClick={() => navigate('projects')}>
-                      View all
-                      <ChevronRight className="ml-1 h-4 w-4" />
+                      View all <ChevronRight className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   </div>
 
                   {projects.length === 0 ? (
-                    <Card>
-                      <CardContent className="p-8 text-center">
-                        <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="font-semibold mb-1">No projects yet</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Create your first project to get started
+                    <Card className="border-dashed">
+                      <CardContent className="p-10 text-center">
+                        <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                          <FolderOpen className="h-7 w-7 text-primary" />
+                        </div>
+                        <h3 className="font-semibold mb-1.5">No projects yet</h3>
+                        <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+                          Create your first project and let AI help you plan, track, and deliver it successfully.
                         </p>
                         <Button onClick={() => navigate('create-project')}>
                           <Plus className="h-4 w-4 mr-2" />
-                          Create Project
+                          Create Your First Project
                         </Button>
                       </CardContent>
                     </Card>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {projects.slice(0, 4).map((project) => (
-                        <Card
-                          key={project.id}
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => navigate('project-detail', { id: project.id })}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-sm truncate">{project.name}</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">{project.projectType}</p>
+                      {projects.slice(0, 4).map((project) => {
+                        const daysLeft = getDaysUntil(project.deadline)
+                        return (
+                          <Card
+                            key={project.id}
+                            className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                            onClick={() => navigate('project-detail', { id: project.id })}
+                          >
+                            <CardContent className="p-5">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                                    {project.name}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getStatusColor(project.status)}`}>
+                                      {project.status.replace(/_/g, ' ')}
+                                    </Badge>
+                                    <span>{project.projectType}</span>
+                                  </p>
+                                </div>
+                                <ProgressRing value={project.progress} size={48} strokeWidth={4} className="ml-3" />
                               </div>
-                              <Badge
-                                variant="outline"
-                                className={`ml-2 shrink-0 text-xs ${getStatusColor(project.status)}`}
-                              >
-                                {project.status.replace(/_/g, ' ')}
-                              </Badge>
-                            </div>
-                            <Progress value={project.progress} className="h-1.5 mb-2" />
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{project._count.tasks} tasks</span>
-                              {project.deadline && (
-                                <span className={isOverdue(project.deadline) ? 'text-red-500' : ''}>
-                                  {formatDate(project.deadline)}
+                              <Progress value={project.progress} className="h-1.5 mb-3" />
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <ListChecks className="h-3 w-3" />
+                                  {project._count.tasks} tasks
                                 </span>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                                {project.deadline ? (
+                                  <span className={`flex items-center gap-1 ${daysLeft !== null && daysLeft < 0 ? 'text-red-500 font-medium' : daysLeft !== null && daysLeft <= 3 ? 'text-amber-500 font-medium' : ''}`}>
+                                    <Clock className="h-3 w-3" />
+                                    {daysLeft !== null && daysLeft < 0
+                                      ? `${Math.abs(daysLeft)}d overdue`
+                                      : daysLeft !== null && daysLeft === 0
+                                      ? 'Due today'
+                                      : daysLeft !== null && daysLeft <= 7
+                                      ? `${daysLeft}d left`
+                                      : formatDate(project.deadline)}
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    No deadline
+                                  </span>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
 
-                {/* Task Completion Chart */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5" />
-                      Task Completion
-                    </CardTitle>
-                    <CardDescription>Tasks completed over the last 7 days</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <div className="h-48">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                          <XAxis dataKey="day" className="text-xs" tick={{ fontSize: 12 }} />
-                          <YAxis className="text-xs" tick={{ fontSize: 12 }} allowDecimals={false} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'hsl(var(--card))',
-                              border: '1px solid hsl(var(--border))',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                            }}
-                          />
-                          <Bar
-                            dataKey="tasks"
-                            fill="hsl(var(--primary))"
-                            radius={[4, 4, 0, 0]}
-                            maxBarSize={40}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Charts Row */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <Card className="md:col-span-3 border-0 shadow-sm">
+                    <CardHeader className="pb-2 px-5 pt-5">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4" />
+                        Task Completion
+                      </CardTitle>
+                      <CardDescription className="text-xs">Last 7 days</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pb-5 px-5">
+                      <div className="h-44">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                            <XAxis dataKey="day" className="text-xs" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <YAxis className="text-xs" tick={{ fontSize: 11 }} allowDecimals={false} axisLine={false} tickLine={false} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--card))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }}
+                            />
+                            <Bar dataKey="tasks" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="md:col-span-2 border-0 shadow-sm">
+                    <CardHeader className="pb-2 px-5 pt-5">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Activity className="h-4 w-4" />
+                        Task Distribution
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pb-5 px-5">
+                      {taskDistData.length > 0 ? (
+                        <div className="flex flex-col items-center">
+                          <div className="h-36 w-36">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={taskDistData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={40}
+                                  outerRadius={65}
+                                  paddingAngle={3}
+                                  dataKey="value"
+                                  strokeWidth={0}
+                                >
+                                  {taskDistData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                            {taskDistData.map((d) => (
+                              <div key={d.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                                <span>{d.name}</span>
+                                <span className="font-medium text-foreground">{d.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center">
+                          <p className="text-sm text-muted-foreground">No tasks yet</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
 
-              {/* Right Column: Activity + Overdue */}
+              {/* Right Column */}
               <div className="space-y-6">
+                {/* Upcoming Deadline */}
+                {nextProject && nextProject.deadline && (
+                  <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-500/[0.03] to-orange-500/[0.03]">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                          <Target className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Deadline</span>
+                      </div>
+                      <h3
+                        className="font-semibold text-sm mb-1 cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => navigate('project-detail', { id: nextProject.id })}
+                      >
+                        {nextProject.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {getDaysUntil(nextProject.deadline) !== null && getDaysUntil(nextProject.deadline)! < 0
+                          ? `Overdue by ${Math.abs(getDaysUntil(nextProject.deadline)!)} days`
+                          : getDaysUntil(nextProject.deadline) === 0
+                          ? 'Due today'
+                          : `${getDaysUntil(nextProject.deadline)} days remaining`}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <Progress value={nextProject.progress} className="h-1.5 flex-1 mr-3" />
+                        <span className="text-xs font-medium">{Math.round(nextProject.progress)}%</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Recent Activity */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Activity className="h-5 w-5" />
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-2 px-5 pt-5">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
                       Recent Activity
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pb-4">
+                  <CardContent className="pb-5 px-5">
                     {recentActivity.length === 0 ? (
                       <div className="text-center py-6">
-                        <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">No recent activity</p>
+                        <Activity className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                        <p className="text-xs text-muted-foreground">No recent activity</p>
                       </div>
                     ) : (
-                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                      <div className="space-y-3 max-h-72 overflow-y-auto">
                         {recentActivity.map((notif) => (
-                          <div key={notif.id} className="flex items-start gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                              <Bell className="h-3.5 w-3.5 text-primary" />
+                          <div key={notif.id} className="flex items-start gap-3 group">
+                            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                              <Bell className="h-3 w-3 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{notif.title}</p>
-                              <p className="text-xs text-muted-foreground truncate">{notif.message}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {formatRelativeTime(notif.createdAt)}
-                              </p>
+                              <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{notif.title}</p>
+                              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{notif.message}</p>
+                              <p className="text-[10px] text-muted-foreground/70 mt-1">{formatRelativeTime(notif.createdAt)}</p>
                             </div>
                           </div>
                         ))}
@@ -613,87 +792,82 @@ export function DashboardPage({ user }: DashboardPageProps) {
                 </Card>
 
                 {/* Overdue Tasks */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-2 px-5 pt-5">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
                       Overdue Tasks
+                      {overdueTasks.length > 0 && (
+                        <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">{overdueTasks.length}</Badge>
+                      )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pb-4">
+                  <CardContent className="pb-5 px-5">
                     {overdueTasks.length === 0 ? (
-                      <div className="text-center py-6">
-                        <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">No overdue tasks</p>
+                      <div className="text-center py-4">
+                        <CheckCircle2 className="h-7 w-7 text-emerald-500/60 mx-auto mb-2" />
+                        <p className="text-xs text-muted-foreground">All tasks on track</p>
                       </div>
                     ) : (
-                      <div className="space-y-3 max-h-80 overflow-y-auto">
-                        {overdueTasks.slice(0, 5).map((task) => (
-                          <div
-                            key={task.id}
-                            className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => navigate('task-detail', { id: task.id })}
-                          >
-                            <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{task.title}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${getPriorityColor(task.priority)}`}
-                                >
-                                  {task.priority}
-                                </Badge>
-                                {task.dueDate && (
-                                  <span className="text-xs text-red-500">
-                                    {formatDate(task.dueDate)}
-                                  </span>
-                                )}
+                      <>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {overdueTasks.slice(0, 5).map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                              onClick={() => navigate('task-detail', { id: task.id })}
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate">{task.title}</p>
+                                <p className="text-[10px] text-red-500">{formatDate(task.dueDate)}</p>
                               </div>
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             </div>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {overdueTasks.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full mt-2"
-                        onClick={() => navigate('tasks')}
-                      >
-                        View all overdue
-                        <ChevronRight className="ml-1 h-4 w-4" />
-                      </Button>
+                          ))}
+                        </div>
+                        {overdueTasks.length > 5 && (
+                          <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => navigate('tasks')}>
+                            View all {overdueTasks.length} overdue
+                            <ChevronRight className="ml-1 h-3 w-3" />
+                          </Button>
+                        )}
+                      </>
                     )}
                   </CardContent>
                 </Card>
 
-                {/* Quick Stats Summary */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Summary
+                {/* Summary */}
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-2 px-5 pt-5">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Overview
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pb-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Total Projects</span>
-                      <span className="font-medium">{projects.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Active Tasks</span>
-                      <span className="font-medium">{allTasks.filter((t) => t.status === 'in_progress').length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Unread Notifications</span>
-                      <span className="font-medium">{unreadCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Overdue</span>
-                      <span className="font-medium text-red-500">{overdueTasks.length}</span>
+                  <CardContent className="pb-5 px-5">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Total Projects</span>
+                        <span className="text-sm font-semibold">{projects.length}</span>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Active Tasks</span>
+                        <span className="text-sm font-semibold">{inProgressTasks.length}</span>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Unread</span>
+                        <span className="text-sm font-semibold">{unreadCount}</span>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Completion Rate</span>
+                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                          {totalTasks > 0 ? `${Math.round((completedTasks.length / totalTasks) * 100)}%` : '--'}
+                        </span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
