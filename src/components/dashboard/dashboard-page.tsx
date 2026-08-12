@@ -299,7 +299,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
           if (!t.dueDate) return false
           const td = new Date(t.dueDate)
           return td.toDateString() === d.toDateString() && td <= new Date()
-        }).length || (i < 4 ? 2 : 0),
+        }).length,
       }
     })
   , [completedTasks])
