@@ -1,0 +1,709 @@
+   110→const resetPasswordSchema = z.object({
+   111→  password: z.string().min(8, 'Password must be at least 8 characters'),
+   112→  confirmPassword: z.string().min(1, 'Please confirm your password'),
+   113→}).refine((data) => data.password === data.confirmPassword, {
+   114→  message: 'Passwords do not match',
+   115→  path: ['confirmPassword'],
+   116→})
+   117→
+   118→// ==================== LOGIN FORM ====================
+   119→
+   120→function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthSuccess']; onSwitch: (v: AuthView) => void }) {
+   121→  const [showPassword, setShowPassword] = useState(false)
+   122→  const [serverError, setServerError] = useState('')
+   123→  const [loading, setLoading] = useState(false)
+   124→
+   125→  const form = useForm<z.infer<typeof loginSchema>>({
+   126→    resolver: zodResolver(loginSchema),
+   127→    defaultValues: { email: '', password: '' },
+   128→  })
+   129→
+   130→  async function onSubmit(values: z.infer<typeof loginSchema>) {
+   131→    setServerError('')
+   132→    setLoading(true)
+   133→    try {
+   134→      const result = await signIn('credentials', {
+   135→        email: values.email,
+   136→        password: values.password,
+   137→        redirect: false,
+   138→      })
+   139→
+   140→      if (result?.error) {
+   141→        setServerError('Invalid email or password. Please try again.')
+   142→        return
+   143→      }
+   144→
+   145→      const sessionRes = await fetch('/api/auth/session')
+   146→      const session = await sessionRes.json()
+   147→
+   148→      if (session?.user) {
+   149→        const userId = (session.user as Record<string, string>).id
+   150→        if (userId) {
+   151→          onSuccess({
+   152→            id: userId,
+   153→            email: session.user.email,
+   154→            name: session.user.name || '',
+   155→            role: (session.user as Record<string, string>).role || 'member',
+   156→          })
+   157→        } else {
+   158→          const profileRes = await fetch(`/api/auth/register?email=${encodeURIComponent(values.email)}`)
+   159→          const profileData = await profileRes.json()
+   160→          if (profileData.data) {
+   161→            onSuccess({
+   162→              id: profileData.data.id,
+   163→              email: profileData.data.email,
+   164→              name: profileData.data.name || '',
+   165→              role: profileData.data.role || 'member',
+   166→            })
+   167→          }
+   168→        }
+   169→      }
+   170→    } catch {
+   171→      setServerError('An unexpected error occurred. Please try again.')
+   172→    } finally {
+   173→      setLoading(false)
+   174→    }
+   175→  }
+   176→
+   177→  return (
+   178→    <div className="space-y-5">
+   179→      <div className="space-y-1.5">
+   180→        <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
+   181→        <p className="text-sm text-muted-foreground">Sign in to continue to Project OS AI</p>
+   182→      </div>
+   183→
+   184→      {serverError && (
+   185→        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+   186→          {serverError}
+   187→        </div>
+   188→      )}
+   189→
+   190→      <Form {...form}>
+   191→        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+   192→          <FormField
+   193→            control={form.control}
+   194→            name="email"
+   195→            render={({ field }) => (
+   196→              <FormItem>
+   197→                <FormLabel>Email</FormLabel>
+   198→                <FormControl>
+   199→                  <div className="relative">
+   200→                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   201→                    <Input placeholder="you@example.com" className="pl-10" {...field} />
+   202→                  </div>
+   203→                </FormControl>
+   204→                <FormMessage />
+   205→              </FormItem>
+   206→            )}
+   207→          />
+   208→          <FormField
+   209→            control={form.control}
+   210→            name="password"
+   211→            render={({ field }) => (
+   212→              <FormItem>
+   213→                <div className="flex items-center justify-between">
+   214→                  <FormLabel>Password</FormLabel>
+   215→                  <Button type="button" variant="link" className="px-0 h-auto text-xs text-muted-foreground hover:text-primary" onClick={() => onSwitch('forgot-password')}>
+   216→                    Forgot password?
+   217→                  </Button>
+   218→                </div>
+   219→                <FormControl>
+   220→                  <div className="relative">
+   221→                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   222→                    <Input type={showPassword ? 'text' : 'password'} placeholder="Enter your password" className="pl-10 pr-10" {...field} />
+   223→                    <button
+   224→                      type="button"
+   225→                      onClick={() => setShowPassword(!showPassword)}
+   226→                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+   227→                    >
+   228→                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   229→                    </button>
+   230→                  </div>
+   231→                </FormControl>
+   232→                <FormMessage />
+   233→              </FormItem>
+   234→            )}
+   235→          />
+   236→          <Button type="submit" className="w-full" disabled={loading}>
+   237→            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   238→            Sign In
+   239→          </Button>
+   240→        </form>
+   241→      </Form>
+   242→
+   243→      <div className="relative">
+   244→        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+   245→        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+   246→      </div>
+   247→
+   248→      <div className="text-center text-sm text-muted-foreground">
+   249→        Don&apos;t have an account?{' '}
+   250→        <button onClick={() => onSwitch('signup')} className="text-primary hover:underline font-medium">
+   251→          Create one free
+   252→        </button>
+   253→      </div>
+   254→    </div>
+   255→  )
+   256→}
+   257→
+   258→// ==================== SIGNUP FORM ====================
+   259→
+   260→function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthSuccess']; onSwitch: (v: AuthView) => void }) {
+   261→  const [showPassword, setShowPassword] = useState(false)
+   262→  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+   263→  const [serverError, setServerError] = useState('')
+   264→  const [loading, setLoading] = useState(false)
+   265→
+   266→  const form = useForm<z.infer<typeof signupSchema>>({
+   267→    resolver: zodResolver(signupSchema),
+   268→    defaultValues: { name: '', email: '', password: '', confirmPassword: '' },
+   269→  })
+   270→
+   271→  async function onSubmit(values: z.infer<typeof signupSchema>) {
+   272→    setServerError('')
+   273→    setLoading(true)
+   274→    try {
+   275→      const res = await fetch('/api/auth/register', {
+   276→        method: 'POST',
+   277→        headers: { 'Content-Type': 'application/json' },
+   278→        body: JSON.stringify({ name: values.name, email: values.email, password: values.password }),
+   279→      })
+   280→
+   281→      const regData = await res.json()
+   282→
+   283→      if (!res.ok) {
+   284→        setServerError(regData.error || 'Registration failed. Please try again.')
+   285→        return
+   286→      }
+   287→
+   288→      const registeredUser = regData.data
+   289→
+   290→      // Sign in to establish session cookie
+   291→      const result = await signIn('credentials', {
+   292→        email: values.email,
+   293→        password: values.password,
+   294→        redirect: false,
+   295→      })
+   296→
+   297→      if (!result?.ok) {
+   298→        setServerError('Registration succeeded but login failed. Please try signing in manually.')
+   299→        return
+   300→      }
+   301→
+   302→      // Small delay to ensure session cookie is set
+   303→      await new Promise((r) => setTimeout(r, 300))
+   304→
+   305→      const sessionRes = await fetch('/api/auth/session')
+   306→      const session = await sessionRes.json()
+   307→      const sessionUser = session?.user as Record<string, string> | undefined
+   308→
+   309→      if (sessionUser?.id) {
+   310→        onSuccess({
+   311→          id: sessionUser.id,
+   312→          email: sessionUser.email || values.email,
+   313→          name: sessionUser.name || values.name,
+   314→          role: sessionUser.role || 'member',
+   315→        })
+   316→      } else if (registeredUser) {
+   317→        // Fallback: use registered user data if session fetch failed
+   318→        onSuccess({
+   319→          id: registeredUser.id,
+   320→          email: registeredUser.email,
+   321→          name: registeredUser.name || values.name,
+   322→          role: registeredUser.role || 'member',
+   323→        })
+   324→      }
+   325→    } catch {
+   326→      setServerError('An unexpected error occurred. Please try again.')
+   327→    } finally {
+   328→      setLoading(false)
+   329→    }
+   330→  }
+   331→
+   332→  return (
+   333→    <div className="space-y-5">
+   334→      <div className="space-y-1.5">
+   335→        <h2 className="text-2xl font-bold tracking-tight">Create your account</h2>
+   336→        <p className="text-sm text-muted-foreground">Start managing projects with AI today</p>
+   337→      </div>
+   338→
+   339→      {serverError && (
+   340→        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+   341→          {serverError}
+   342→        </div>
+   343→      )}
+   344→
+   345→      <Form {...form}>
+   346→        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+   347→          <FormField
+   348→            control={form.control}
+   349→            name="name"
+   350→            render={({ field }) => (
+   351→              <FormItem>
+   352→                <FormLabel>Full Name</FormLabel>
+   353→                <FormControl>
+   354→                  <div className="relative">
+   355→                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   356→                    <Input placeholder="John Doe" className="pl-10" {...field} />
+   357→                  </div>
+   358→                </FormControl>
+   359→                <FormMessage />
+   360→              </FormItem>
+   361→            )}
+   362→          />
+   363→          <FormField
+   364→            control={form.control}
+   365→            name="email"
+   366→            render={({ field }) => (
+   367→              <FormItem>
+   368→                <FormLabel>Email</FormLabel>
+   369→                <FormControl>
+   370→                  <div className="relative">
+   371→                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   372→                    <Input placeholder="you@example.com" className="pl-10" {...field} />
+   373→                  </div>
+   374→                </FormControl>
+   375→                <FormMessage />
+   376→              </FormItem>
+   377→            )}
+   378→          />
+   379→          <div className="grid grid-cols-2 gap-3">
+   380→            <FormField
+   381→              control={form.control}
+   382→              name="password"
+   383→              render={({ field }) => (
+   384→                <FormItem>
+   385→                  <FormLabel>Password</FormLabel>
+   386→                  <FormControl>
+   387→                    <div className="relative">
+   388→                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   389→                      <Input type={showPassword ? 'text' : 'password'} placeholder="Min. 8 chars" className="pl-10 pr-9" {...field} />
+   390→                      <button
+   391→                        type="button"
+   392→                        onClick={() => setShowPassword(!showPassword)}
+   393→                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+   394→                      >
+   395→                        {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   396→                      </button>
+   397→                    </div>
+   398→                  </FormControl>
+   399→                  <FormMessage />
+   400→                </FormItem>
+   401→              )}
+   402→            />
+   403→            <FormField
+   404→              control={form.control}
+   405→              name="confirmPassword"
+   406→              render={({ field }) => (
+   407→                <FormItem>
+   408→                  <FormLabel>Confirm</FormLabel>
+   409→                  <FormControl>
+   410→                    <div className="relative">
+   411→                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   412→                      <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm" className="pl-10 pr-9" {...field} />
+   413→                      <button
+   414→                        type="button"
+   415→                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+   416→                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+   417→                      >
+   418→                        {showConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   419→                      </button>
+   420→                    </div>
+   421→                  </FormControl>
+   422→                  <FormMessage />
+   423→                </FormItem>
+   424→              )}
+   425→            />
+   426→          </div>
+   427→          <Button type="submit" className="w-full" disabled={loading}>
+   428→            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   429→            Create Account
+   430→          </Button>
+   431→        </form>
+   432→      </Form>
+   433→
+   434→      <div className="relative">
+   435→        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+   436→        <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+   437→      </div>
+   438→
+   439→      <div className="text-center text-sm text-muted-foreground">
+   440→        Already have an account?{' '}
+   441→        <button onClick={() => onSwitch('login')} className="text-primary hover:underline font-medium">
+   442→          Sign in
+   443→        </button>
+   444→      </div>
+   445→    </div>
+   446→  )
+   447→}
+   448→
+   449→// ==================== FORGOT PASSWORD FORM ====================
+   450→
+   451→function ForgotPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
+   452→  const [serverError, setServerError] = useState('')
+   453→  const [success, setSuccess] = useState(false)
+   454→  const [loading, setLoading] = useState(false)
+   455→
+   456→  const form = useForm<z.infer<typeof forgotPasswordSchema>>({
+   457→    resolver: zodResolver(forgotPasswordSchema),
+   458→    defaultValues: { email: '' },
+   459→  })
+   460→
+   461→  async function onSubmit(values: z.infer<typeof forgotPasswordSchema>) {
+   462→    setServerError('')
+   463→    setLoading(true)
+   464→    try {
+   465→      const res = await fetch('/api/auth/forgot-password', {
+   466→        method: 'POST',
+   467→        headers: { 'Content-Type': 'application/json' },
+   468→        body: JSON.stringify({ email: values.email }),
+   469→      })
+   470→
+   471→      if (!res.ok) {
+   472→        const data = await res.json()
+   473→        setServerError(data.error || 'Failed to send reset email.')
+   474→        return
+   475→      }
+   476→
+   477→      setSuccess(true)
+   478→    } catch {
+   479→      setServerError('An unexpected error occurred.')
+   480→    } finally {
+   481→      setLoading(false)
+   482→    }
+   483→  }
+   484→
+   485→  if (success) {
+   486→    return (
+   487→      <div className="space-y-6">
+   488→        <div className="text-center space-y-3">
+   489→          <div className="mx-auto w-14 h-14 rounded-full bg-[#22C55E]/10 flex items-center justify-center">
+   490→            <CheckCircle2 className="h-7 w-7 text-[#22C55E]" />
+   491→          </div>
+   492→          <div className="space-y-1.5">
+   493→            <h2 className="text-2xl font-bold tracking-tight">Check your email</h2>
+   494→            <p className="text-sm text-muted-foreground">
+   495→              We&apos;ve sent a password reset link to your email address.
+   496→            </p>
+   497→          </div>
+   498→        </div>
+   499→        <Button className="w-full" onClick={() => onSwitch('login')}>
+   500→          Back to Sign In
+   501→        </Button>
+   502→      </div>
+   503→    )
+   504→  }
+   505→
+   506→  return (
+   507→    <div className="space-y-5">
+   508→      <div className="space-y-1.5">
+   509→        <h2 className="text-2xl font-bold tracking-tight">Forgot password?</h2>
+   510→        <p className="text-sm text-muted-foreground">
+   511→          Enter your email and we&apos;ll send you a reset link
+   512→        </p>
+   513→      </div>
+   514→
+   515→      {serverError && (
+   516→        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+   517→          {serverError}
+   518→        </div>
+   519→      )}
+   520→
+   521→      <Form {...form}>
+   522→        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+   523→          <FormField
+   524→            control={form.control}
+   525→            name="email"
+   526→            render={({ field }) => (
+   527→              <FormItem>
+   528→                <FormLabel>Email</FormLabel>
+   529→                <FormControl>
+   530→                  <div className="relative">
+   531→                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   532→                    <Input placeholder="you@example.com" className="pl-10" {...field} />
+   533→                  </div>
+   534→                </FormControl>
+   535→                <FormMessage />
+   536→              </FormItem>
+   537→            )}
+   538→          />
+   539→          <Button type="submit" className="w-full" disabled={loading}>
+   540→            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   541→            Send Reset Link
+   542→          </Button>
+   543→        </form>
+   544→      </Form>
+   545→
+   546→      <div className="flex justify-center">
+   547→        <Button type="button" variant="ghost" size="sm" onClick={() => onSwitch('login')}>
+   548→          <ArrowLeft className="mr-2 h-4 w-4" />
+   549→          Back to Sign In
+   550→        </Button>
+   551→      </div>
+   552→    </div>
+   553→  )
+   554→}
+   555→
+   556→// ==================== RESET PASSWORD FORM ====================
+   557→
+   558→function ResetPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
+   559→  const [showPassword, setShowPassword] = useState(false)
+   560→  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+   561→  const [serverError, setServerError] = useState('')
+   562→  const [loading, setLoading] = useState(false)
+   563→
+   564→  const form = useForm<z.infer<typeof resetPasswordSchema>>({
+   565→    resolver: zodResolver(resetPasswordSchema),
+   566→    defaultValues: { password: '', confirmPassword: '' },
+   567→  })
+   568→
+   569→  async function onSubmit(values: z.infer<typeof resetPasswordSchema>) {
+   570→    setServerError('')
+   571→    setLoading(true)
+   572→    try {
+   573→      const res = await fetch('/api/auth/reset-password', {
+   574→        method: 'POST',
+   575→        headers: { 'Content-Type': 'application/json' },
+   576→        body: JSON.stringify({ password: values.password }),
+   577→      })
+   578→
+   579→      if (!res.ok) {
+   580→        const data = await res.json()
+   581→        setServerError(data.error || 'Failed to reset password.')
+   582→        return
+   583→      }
+   584→
+   585→      onSwitch('login')
+   586→    } catch {
+   587→      setServerError('An unexpected error occurred.')
+   588→    } finally {
+   589→      setLoading(false)
+   590→    }
+   591→  }
+   592→
+   593→  return (
+   594→    <div className="space-y-5">
+   595→      <div className="space-y-1.5">
+   596→        <h2 className="text-2xl font-bold tracking-tight">Reset password</h2>
+   597→        <p className="text-sm text-muted-foreground">Enter your new password</p>
+   598→      </div>
+   599→
+   600→      {serverError && (
+   601→        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+   602→          {serverError}
+   603→        </div>
+   604→      )}
+   605→
+   606→      <Form {...form}>
+   607→        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+   608→          <FormField
+   609→            control={form.control}
+   610→            name="password"
+   611→            render={({ field }) => (
+   612→              <FormItem>
+   613→                <FormLabel>New Password</FormLabel>
+   614→                <FormControl>
+   615→                  <div className="relative">
+   616→                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   617→                    <Input type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" className="pl-10 pr-10" {...field} />
+   618→                    <button
+   619→                      type="button"
+   620→                      onClick={() => setShowPassword(!showPassword)}
+   621→                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+   622→                    >
+   623→                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   624→                    </button>
+   625→                  </div>
+   626→                </FormControl>
+   627→                <FormMessage />
+   628→              </FormItem>
+   629→            )}
+   630→          />
+   631→          <FormField
+   632→            control={form.control}
+   633→            name="confirmPassword"
+   634→            render={({ field }) => (
+   635→              <FormItem>
+   636→                <FormLabel>Confirm New Password</FormLabel>
+   637→                <FormControl>
+   638→                  <div className="relative">
+   639→                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   640→                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm new password" className="pl-10 pr-10" {...field} />
+   641→                    <button
+   642→                      type="button"
+   643→                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+   644→                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+   645→                    >
+   646→                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   647→                    </button>
+   648→                  </div>
+   649→                </FormControl>
+   650→                <FormMessage />
+   651→              </FormItem>
+   652→            )}
+   653→          />
+   654→          <Button type="submit" className="w-full" disabled={loading}>
+   655→            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   656→            Reset Password
+   657→          </Button>
+   658→        </form>
+   659→      </Form>
+   660→
+   661→      <div className="flex justify-center">
+   662→        <Button type="button" variant="ghost" size="sm" onClick={() => onSwitch('login')}>
+   663→          <ArrowLeft className="mr-2 h-4 w-4" />
+   664→          Back to Sign In
+   665→        </Button>
+   666→      </div>
+   667→    </div>
+   668→  )
+   669→}
+   670→
+   671→// ==================== LEFT PANEL: BRANDING ====================
+   672→
+   673→function BrandingPanel({ view }: { view: AuthView }) {
+   674→  return (
+   675→    <div className="hidden lg:flex lg:w-[55%] xl:w-[58%] relative flex-col justify-between p-8 xl:p-12 overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white">
+   676→      {/* Background Image with Overlay */}
+   677→      <div className="absolute inset-0">
+   678→        <img
+   679→          src="/hero-illustration.png"
+   680→          alt=""
+   681→          className="w-full h-full object-cover opacity-20"
+   682→        />
+   683→        <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/95 via-[#0F172A]/60 to-[#0F172A]/80" />
+   684→      </div>
+   685→
+   686→      {/* Content */}
+   687→      <div className="relative z-10">
+   688→        <div className="flex items-center gap-3 mb-1">
+   689→          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
+   690→            <Brain className="h-5 w-5 text-white" />
+   691→          </div>
+   692→          <span className="text-lg font-bold tracking-tight">Project OS AI</span>
+   693→        </div>
+   694→      </div>
+   695→
+   696→      {/* Hero section */}
+   697→      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-lg">
+   698→        {view === 'login' || view === 'forgot-password' || view === 'reset-password' ? (
+   699→          <>
+   700→            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 w-fit mb-6">
+   701→              <Zap className="h-3.5 w-3.5 text-[#94A3B8]" />
+   702→              <span className="text-xs font-medium text-[#CBD5E1]">AI-Powered Project Management</span>
+   703→            </div>
+   704→            <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
+   705→              Build projects
+   706→              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#94A3B8] to-[#64748B]"> smarter</span>,
+   707→              <br />not harder
+   708→            </h2>
+   709→            <p className="text-[#CBD5E1] text-sm xl:text-base leading-relaxed mb-8">
+   710→              The all-in-one AI operating system for student projects. Plan, track, verify, and deliver with intelligent assistance at every step.
+   711→            </p>
+   712→
+   713→            {/* Features grid */}
+   714→            <div className="grid grid-cols-2 gap-3">
+   715→              {FEATURES.slice(0, 4).map((feature) => (
+   716→                <div
+   717→                  key={feature.title}
+   718→                  className="flex items-start gap-2.5 p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/5 hover:bg-white/10 transition-colors"
+   719→                >
+   720→                  <feature.icon className="h-4 w-4 mt-0.5 text-[#94A3B8] shrink-0" />
+   721→                  <div>
+   722→                    <p className="text-xs font-semibold text-white">{feature.title}</p>
+   723→                    <p className="text-[11px] text-[#94A3B8] leading-relaxed mt-0.5">{feature.desc}</p>
+   724→                  </div>
+   725→                </div>
+   726→              ))}
+   727→            </div>
+   728→          </>
+   729→        ) : (
+   730→          <>
+   731→            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 w-fit mb-6">
+   732→              <Sparkles className="h-3.5 w-3.5 text-[#94A3B8]" />
+   733→              <span className="text-xs font-medium text-[#CBD5E1]">Get started in seconds</span>
+   734→            </div>
+   735→            <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
+   736→              Your AI project
+   737→              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#94A3B8] to-[#64748B]"> companion</span>
+   738→              <br />awaits
+   739→            </h2>
+   740→            <p className="text-[#CBD5E1] text-sm xl:text-base leading-relaxed mb-8">
+   741→              Join thousands of students delivering exceptional projects. Get AI-powered planning, smart tracking, and automatic documentation.
+   742→            </p>
+   743→
+   744→            {/* All 6 features */}
+   745→            <div className="space-y-2.5">
+   746→              {FEATURES.map((feature) => (
+   747→                <div key={feature.title} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors">
+   748→                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+   749→                    <feature.icon className="h-4 w-4 text-[#94A3B8]" />
+   750→                  </div>
+   751→                  <div className="flex-1 min-w-0">
+   752→                    <p className="text-sm font-medium text-white">{feature.title}</p>
+   753→                  </div>
+   754→                  <CheckCircle2 className="h-4 w-4 text-[#94A3B8]/60 shrink-0" />
+   755→                </div>
+   756→              ))}
+   757→            </div>
+   758→          </>
+   759→        )}
+   760→      </div>
+   761→
+   762→      {/* Stats bar */}
+   763→      <div className="relative z-10 mt-8 pt-6 border-t border-white/10">
+   764→        <div className="grid grid-cols-4 gap-4">
+   765→          {STATS.map((stat) => (
+   766→            <div key={stat.label} className="text-center">
+   767→              <p className="text-lg xl:text-xl font-bold text-white">{stat.value}</p>
+   768→              <p className="text-[11px] text-[#94A3B8]">{stat.label}</p>
+   769→            </div>
+   770→          ))}
+   771→        </div>
+   772→      </div>
+   773→    </div>
+   774→  )
+   775→}
+   776→
+   777→// ==================== MAIN COMPONENT ====================
+   778→
+   779→export function AuthPages({ onAuthSuccess }: AuthPagesProps) {
+   780→  const [view, setView] = useState<AuthView>('login')
+   781→
+   782→  return (
+   783→    <div className="min-h-screen flex bg-background">
+   784→      {/* Left Panel - Branding */}
+   785→      <BrandingPanel view={view} />
+   786→
+   787→      {/* Right Panel - Auth Form */}
+   788→      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+   789→        <div className="w-full max-w-[420px]">
+   790→          {/* Mobile header */}
+   791→          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+   792→            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+   793→              <Brain className="h-5 w-5 text-primary" />
+   794→            </div>
+   795→            <span className="text-lg font-bold tracking-tight">Project OS AI</span>
+   796→          </div>
+   797→
+   798→          <Card className="border-0 shadow-none sm:border sm:shadow-sm">
+   799→            <CardContent className="p-6 sm:p-8">
+   800→              {view === 'login' && <LoginForm onSuccess={onAuthSuccess} onSwitch={setView} />}
+   801→              {view === 'signup' && <SignupForm onSuccess={onAuthSuccess} onSwitch={setView} />}
+   802→              {view === 'forgot-password' && <ForgotPasswordForm onSwitch={setView} />}
+   803→              {view === 'reset-password' && <ResetPasswordForm onSwitch={setView} />}
+   804→            </CardContent>
+   805→          </Card>
+   806→
+   807→          <p className="text-center text-[11px] text-muted-foreground mt-6">
+   808→            By continuing, you agree to our{' '}
+   809→            <span className="text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2">Terms</span>
+   810→            {' '}and{' '}
+   811→            <span className="text-muted-foreground hover:text-foreground cursor-pointer underline underline-offset-2">Privacy Policy</span>
+   812→          </p>
+   813→        </div>
+   814→      </div>
+   815→    </div>
+   816→  )
+   817→}
+   818→

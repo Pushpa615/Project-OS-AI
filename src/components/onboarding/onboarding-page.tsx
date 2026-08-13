@@ -578,6 +578,7 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
   const [personalData, setPersonalData] = useState<z.infer<typeof personalInfoSchema> | null>(null)
   const [skills, setSkills] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function handlePersonalInfoNext(data: z.infer<typeof personalInfoSchema>) {
     setPersonalData(data)
@@ -593,8 +594,8 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
     if (!personalData) return
 
     setSaving(true)
+    setError('')
     try {
-      // Save onboarding data
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -610,12 +611,15 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
         }),
       })
       if (!res.ok) {
-        console.error('Failed to save onboarding data')
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Failed to save onboarding data')
+        console.error('Failed to save onboarding data:', data.error || res.status)
         return
       }
       onComplete()
-    } catch (error) {
-      console.error('Onboarding save error:', error)
+    } catch (err) {
+      console.error('Onboarding save error:', err)
+      setError('Network error. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -653,6 +657,12 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-6 sm:p-8">
+            {error && (
+              <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between">
+                <span>{error}</span>
+                <button onClick={handleComplete} className="ml-2 underline underline-offset-2 hover:text-foreground transition-colors shrink-0">Retry</button>
+              </div>
+            )}
             {step === 1 && <PersonalInfoStep onNext={handlePersonalInfoNext} />}
             {step === 2 && (
               <SkillsStep

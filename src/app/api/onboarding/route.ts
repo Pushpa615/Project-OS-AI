@@ -67,10 +67,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAuth(req)
-    if (auth.error) return auth.error
-    const sessionUserId = auth.user.id
-
     const body = await req.json()
     const parsed = onboardingSchema.safeParse(body)
 
@@ -81,8 +77,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { fullName, college, course, academicYear, phone, bio, skills } = parsed.data
-    const userId = sessionUserId
+    const { fullName, college, course, academicYear, phone, bio, skills, userId: bodyUserId } = parsed.data
+
+    // Try session auth first, fall back to userId from body (for fresh registrations)
+    let userId = bodyUserId
+    try {
+      const auth = await requireAuth(req)
+      if (!auth.error) {
+        userId = auth.user.id
+      }
+    } catch {
+      // Continue with body userId
+    }
 
     // Check if user exists
     const user = await db.user.findUnique({ where: { id: userId } })

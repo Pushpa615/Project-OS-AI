@@ -287,30 +287,40 @@ function SignupForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuth
 
       const registeredUser = regData.data
 
+      // Sign in to establish session cookie
       const result = await signIn('credentials', {
         email: values.email,
         password: values.password,
         redirect: false,
       })
 
-      if (registeredUser) {
+      if (!result?.ok) {
+        setServerError('Registration succeeded but login failed. Please try signing in manually.')
+        return
+      }
+
+      // Small delay to ensure session cookie is set
+      await new Promise((r) => setTimeout(r, 300))
+
+      const sessionRes = await fetch('/api/auth/session')
+      const session = await sessionRes.json()
+      const sessionUser = session?.user as Record<string, string> | undefined
+
+      if (sessionUser?.id) {
+        onSuccess({
+          id: sessionUser.id,
+          email: sessionUser.email || values.email,
+          name: sessionUser.name || values.name,
+          role: sessionUser.role || 'member',
+        })
+      } else if (registeredUser) {
+        // Fallback: use registered user data if session fetch failed
         onSuccess({
           id: registeredUser.id,
           email: registeredUser.email,
           name: registeredUser.name || values.name,
           role: registeredUser.role || 'member',
         })
-      } else if (result?.ok) {
-        const sessionRes = await fetch('/api/auth/session')
-        const session = await sessionRes.json()
-        if (session?.user) {
-          onSuccess({
-            id: (session.user as Record<string, string>).id || '',
-            email: session.user.email || '',
-            name: session.user.name || values.name,
-            role: (session.user as Record<string, string>).role || 'member',
-          })
-        }
       }
     } catch {
       setServerError('An unexpected error occurred. Please try again.')
