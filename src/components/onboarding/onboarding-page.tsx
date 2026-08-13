@@ -612,6 +612,11 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+        // If already onboarded, treat as success and proceed
+        if (data.error?.includes('already completed onboarding')) {
+          onComplete()
+          return
+        }
         setError(data.error || 'Failed to save onboarding data')
         console.error('Failed to save onboarding data:', data.error || res.status)
         return

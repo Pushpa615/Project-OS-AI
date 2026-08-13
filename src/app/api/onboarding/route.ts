@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
     const parsed = onboardingSchema.safeParse(body)
 
     if (!parsed.success) {
+      console.error('Onboarding POST validation failed:', JSON.stringify(parsed.error.flatten().fieldErrors))
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
         { status: 400 }
@@ -89,6 +90,8 @@ export async function POST(req: NextRequest) {
     } catch {
       // Continue with body userId
     }
+
+    console.log('Onboarding POST for userId:', userId, 'auth from:', userId === bodyUserId ? 'body' : 'session')
 
     // Check if user exists
     const user = await db.user.findUnique({ where: { id: userId } })
