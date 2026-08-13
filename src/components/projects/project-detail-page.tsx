@@ -126,11 +126,11 @@ interface Project {
 // ==================== HELPERS ====================
 
 const statusColors: Record<string, string> = {
-  active: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  completed: 'bg-teal-100 text-teal-700 border-teal-200',
-  on_hold: 'bg-amber-100 text-amber-700 border-amber-200',
-  planning: 'bg-slate-100 text-slate-700 border-slate-200',
-  archived: 'bg-gray-100 text-gray-600 border-gray-200',
+  active: 'bg-[#ECFDF5] text-[#22C55E] border-[#22C55E]/20',
+  completed: 'bg-[#F1F5F9] text-[#64748B] border-[#64748B]/20',
+  on_hold: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20',
+  planning: 'bg-[#F1F5F9] text-[#334155] border-[#E2E8F0]',
+  archived: 'bg-[#F1F5F9] text-[#64748B] border-[#E2E8F0]',
 }
 
 const PIE_COLORS = ['#94a3b8', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6', '#ef4444', '#06b6d4']
@@ -638,9 +638,9 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                           <div
                             className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                               ms.status === 'completed'
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-[#ECFDF5] text-[#22C55E]'
                                 : ms.progress > 0
-                                  ? 'bg-amber-100 text-amber-700'
+                                  ? 'bg-[#FFFBEB] text-[#F59E0B]'
                                   : 'bg-muted text-muted-foreground'
                             }`}
                           >
@@ -735,9 +735,9 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: 'Total Tasks', value: taskStats.total, icon: CheckCircle, color: 'text-muted-foreground' },
-                { label: 'Completed', value: taskStats.verifiedCompleted, icon: CheckCircle, color: 'text-emerald-600' },
-                { label: 'In Progress', value: taskStats.inProgress, icon: Clock, color: 'text-amber-600' },
-                { label: 'Overdue', value: taskStats.overdue, icon: AlertTriangle, color: 'text-red-600' },
+                { label: 'Completed', value: taskStats.verifiedCompleted, icon: CheckCircle, color: 'text-[#22C55E]' },
+                { label: 'In Progress', value: taskStats.inProgress, icon: Clock, color: 'text-[#F59E0B]' },
+                { label: 'Overdue', value: taskStats.overdue, icon: AlertTriangle, color: 'text-[#EF4444]' },
               ].map((stat) => {
                 const Icon = stat.icon
                 return (
@@ -819,7 +819,7 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                       return (
                         <div className="text-right text-xs hidden sm:block">
                           <p className="text-muted-foreground">{stat.totalTasks} tasks</p>
-                          <p className="font-medium text-emerald-600">{stat.completedTasks} done</p>
+                          <p className="font-medium text-[#22C55E]">{stat.completedTasks} done</p>
                         </div>
                       )
                     })()}
@@ -968,9 +968,9 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                           <div className="flex items-center gap-3">
                             <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${
                               ms.status === 'completed'
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-[#ECFDF5] text-[#22C55E]'
                                 : ms.progress > 0
-                                  ? 'bg-amber-100 text-amber-700'
+                                  ? 'bg-[#FFFBEB] text-[#F59E0B]'
                                   : 'bg-muted text-muted-foreground'
                             }`}>
                               {idx + 1}
@@ -996,12 +996,12 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                                   variant="outline"
                                   className={`text-[10px] px-1.5 py-0 shrink-0 ${
                                     task.status === 'verified_completed'
-                                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                      ? 'bg-[#ECFDF5] text-[#22C55E] border-[#22C55E]/20'
                                       : task.status === 'in_progress'
-                                        ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                        ? 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20'
                                         : task.status === 'overdue'
-                                          ? 'bg-red-100 text-red-700 border-red-200'
-                                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                                          ? 'bg-[#FEF2F2] text-[#EF4444] border-[#EF4444]/20'
+                                          : 'bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]'
                                   }`}
                                 >
                                   {task.status.replace(/_/g, ' ')}
@@ -1068,7 +1068,7 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                           <ul className="space-y-1">
                             {strengths.map((s: string, i: number) => (
                               <li key={i} className="text-sm flex items-start gap-2 text-muted-foreground">
-                                <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                <CheckCircle className="h-3.5 w-3.5 text-[#22C55E] shrink-0 mt-0.5" />
                                 {s}
                               </li>
                             ))}
@@ -1084,7 +1084,7 @@ export function ProjectDetailPage({ projectId, userId }: { projectId: string; us
                           <ul className="space-y-1">
                             {weaknesses.map((w: string, i: number) => (
                               <li key={i} className="text-sm flex items-start gap-2 text-muted-foreground">
-                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                <AlertTriangle className="h-3.5 w-3.5 text-[#F59E0B] shrink-0 mt-0.5" />
                                 {w}
                               </li>
                             ))}

@@ -103,20 +103,20 @@ interface Comment {
 // ==================== HELPERS ====================
 
 const statusColors: Record<string, string> = {
-  not_started: 'bg-slate-100 text-slate-700 border-slate-200',
-  in_progress: 'bg-amber-100 text-amber-700 border-amber-200',
-  blocked: 'bg-red-100 text-red-700 border-red-200',
-  submitted: 'bg-violet-100 text-violet-700 border-violet-200',
-  under_review: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  verified_completed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  overdue: 'bg-red-100 text-red-600 border-red-200',
+  not_started: 'bg-[#F1F5F9] text-[#334155] border-[#E2E8F0]',
+  in_progress: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20',
+  blocked: 'bg-[#FEF2F2] text-[#EF4444] border-[#EF4444]/20',
+  submitted: 'bg-[#F1F5F9] text-[#64748B] border-[#64748B]/20',
+  under_review: 'bg-[#F1F5F9] text-[#64748B] border-[#64748B]/20',
+  verified_completed: 'bg-[#ECFDF5] text-[#22C55E] border-[#22C55E]/20',
+  overdue: 'bg-[#FEF2F2] text-[#EF4444] border-[#EF4444]/20',
 }
 
 const priorityConfig: Record<string, { color: string; label: string }> = {
-  critical: { color: 'bg-red-100 text-red-700 border-red-200', label: 'Critical' },
-  high: { color: 'bg-orange-100 text-orange-700 border-orange-200', label: 'High' },
-  medium: { color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Medium' },
-  low: { color: 'bg-slate-100 text-slate-600 border-slate-200', label: 'Low' },
+  critical: { color: 'bg-[#FEF2F2] text-[#EF4444] border-[#EF4444]/20', label: 'Critical' },
+  high: { color: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20', label: 'High' },
+  medium: { color: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20', label: 'Medium' },
+  low: { color: 'bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]', label: 'Low' },
 }
 
 const evidenceTypeIcons: Record<string, React.ElementType> = {
@@ -594,7 +594,7 @@ export function TaskDetailPage({ taskId, userId }: { taskId: string; userId: str
                     Save Changes
                   </Button>
                   {saveSuccess && (
-                    <span className="text-xs text-emerald-600 flex items-center gap-1">
+                    <span className="text-xs text-[#22C55E] flex items-center gap-1">
                       <CheckCircle className="h-3.5 w-3.5" />
                       Saved!
                     </span>
@@ -733,10 +733,10 @@ export function TaskDetailPage({ taskId, userId }: { taskId: string; userId: str
                                 variant="outline"
                                 className={`text-[10px] shrink-0 ${
                                   ev.confidence >= 70
-                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                    ? 'bg-[#ECFDF5] text-[#22C55E] border-[#22C55E]/20'
                                     : ev.confidence >= 40
-                                      ? 'bg-amber-100 text-amber-700 border-amber-200'
-                                      : 'bg-red-100 text-red-700 border-red-200'
+                                      ? 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20'
+                                      : 'bg-[#FEF2F2] text-[#EF4444] border-[#EF4444]/20'
                                 }`}
                               >
                                 {Math.round(ev.confidence)}% confidence

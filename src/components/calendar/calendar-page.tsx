@@ -91,9 +91,9 @@ const TYPE_ICONS: Record<EventType, typeof Target> = {
 }
 
 const TYPE_COLORS: Record<EventType, string> = {
-  milestone: 'bg-emerald-500',
-  task: 'bg-amber-500',
-  meeting: 'bg-violet-500',
+  milestone: 'bg-[#ECFDF5]0',
+  task: 'bg-[#FFFBEB]0',
+  meeting: 'bg-[#64748B]',
 }
 
 const DURATION_OPTIONS = [
@@ -276,12 +276,12 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
   }, [selectedDate, getEventsForDay])
 
   const getEventDisplayColor = useCallback((event: CalendarEvent) => {
-    if (event.color === '#ef4444' || event.color === '#dc2626') return 'bg-red-500'
-    if (event.color === '#22c55e') return 'bg-emerald-500'
+    if (event.color === '#ef4444' || event.color === '#dc2626') return 'bg-[#FEF2F2]0'
+    if (event.color === '#22c55e') return 'bg-[#ECFDF5]0'
     if (event.color === '#f59e0b' || event.color === '#ca8a04' || event.color === '#ea580c')
-      return 'bg-amber-500'
-    if (event.color === '#6366f1' || event.color === '#8b5cf6') return 'bg-violet-500'
-    return 'bg-gray-500'
+      return 'bg-[#FFFBEB]0'
+    if (event.color === '#6366f1' || event.color === '#8b5cf6') return 'bg-[#64748B]'
+    return 'bg-[#F8FAFC]0'
   }, [])
 
   const getEventBorderClass = useCallback((event: CalendarEvent) => {
@@ -530,14 +530,14 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
                           <div
                             className={
                               'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ' +
-                              (overdue ? 'bg-red-100 dark:bg-red-900/20' : 'bg-muted')
+                              (overdue ? 'bg-[#FEF2F2] dark:bg-[#EF4444]/20' : 'bg-muted')
                             }
                           >
                             <Icon
                               className={
                                 'h-4 w-4 ' +
                                 (overdue
-                                  ? 'text-red-600 dark:text-red-400'
+                                  ? 'text-[#EF4444] dark:text-[#EF4444]'
                                   : 'text-muted-foreground')
                               }
                             />
@@ -552,12 +552,12 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
                                 className={
                                   'text-[10px] px-1.5 py-0 ' +
                                   (event.type === 'milestone'
-                                    ? 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+                                    ? 'border-[#22C55E]/50 text-[#22C55E] dark:text-[#22C55E]'
                                     : event.type === 'meeting'
-                                      ? 'border-violet-500/50 text-violet-600 dark:text-violet-400'
+                                      ? 'border-[#64748B]/50 text-[#64748B] dark:text-[#64748B]'
                                       : overdue
-                                        ? 'border-red-500/50 text-red-600 dark:text-red-400'
-                                        : 'border-amber-500/50 text-amber-600 dark:text-amber-400')
+                                        ? 'border-[#EF4444]/50 text-[#EF4444] dark:text-[#EF4444]'
+                                        : 'border-[#F59E0B]/50 text-[#F59E0B] dark:text-[#F59E0B]')
                                 }
                               >
                                 {event.type === 'milestone'
@@ -601,19 +601,19 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="font-medium">Legend:</span>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-emerald-500" />
+              <span className="h-3 w-3 rounded-full bg-[#ECFDF5]0" />
               <span>Milestones</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-amber-500" />
+              <span className="h-3 w-3 rounded-full bg-[#FFFBEB]0" />
               <span>Task Deadlines</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-red-500" />
+              <span className="h-3 w-3 rounded-full bg-[#FEF2F2]0" />
               <span>Overdue</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-violet-500" />
+              <span className="h-3 w-3 rounded-full bg-[#64748B]" />
               <span>Meetings</span>
             </div>
           </div>
@@ -644,13 +644,13 @@ export function CalendarPage({ userId, projectId }: CalendarPageProps) {
                 <SelectContent>
                   <SelectItem value="meeting">
                     <div className="flex items-center gap-2">
-                      <Users className="h-3.5 w-3.5 text-violet-500" />
+                      <Users className="h-3.5 w-3.5 text-[#64748B]" />
                       Meeting
                     </div>
                   </SelectItem>
                   <SelectItem value="milestone">
                     <div className="flex items-center gap-2">
-                      <Target className="h-3.5 w-3.5 text-emerald-500" />
+                      <Target className="h-3.5 w-3.5 text-[#22C55E]" />
                       Milestone
                     </div>
                   </SelectItem>

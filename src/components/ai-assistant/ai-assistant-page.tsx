@@ -73,10 +73,10 @@ interface AIAssistantPageProps {
 type AssistantMode = 'code' | 'bug' | 'docs' | 'deadline'
 
 const MODES: { value: AssistantMode; label: string; icon: React.ElementType; color: string; description: string }[] = [
-  { value: 'code', label: 'Code Help', icon: Code2, color: 'text-emerald-500', description: 'Get coding assistance' },
-  { value: 'bug', label: 'Bug Fix', icon: Bug, color: 'text-red-500', description: 'Debug and fix issues' },
-  { value: 'docs', label: 'Docs', icon: FileText, color: 'text-violet-500', description: 'Generate documentation' },
-  { value: 'deadline', label: 'Timeline', icon: CalendarClock, color: 'text-amber-500', description: 'Analyze deadlines' },
+  { value: 'code', label: 'Code Help', icon: Code2, color: 'text-[#22C55E]', description: 'Get coding assistance' },
+  { value: 'bug', label: 'Bug Fix', icon: Bug, color: 'text-[#EF4444]', description: 'Debug and fix issues' },
+  { value: 'docs', label: 'Docs', icon: FileText, color: 'text-[#64748B]', description: 'Generate documentation' },
+  { value: 'deadline', label: 'Timeline', icon: CalendarClock, color: 'text-[#F59E0B]', description: 'Analyze deadlines' },
 ]
 
 const DOC_TYPES = [
@@ -518,10 +518,10 @@ export function AIAssistantPage({ userId, projectId, taskId }: AIAssistantPagePr
                 <div className="space-y-3">
                   <div className={cn(
                     'h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto',
-                    activeMode === 'code' && 'bg-emerald-500/10',
-                    activeMode === 'bug' && 'bg-red-500/10',
-                    activeMode === 'docs' && 'bg-violet-500/10',
-                    activeMode === 'deadline' && 'bg-amber-500/10'
+                    activeMode === 'code' && 'bg-[#ECFDF5]0/10',
+                    activeMode === 'bug' && 'bg-[#FEF2F2]0/10',
+                    activeMode === 'docs' && 'bg-[#64748B]/10',
+                    activeMode === 'deadline' && 'bg-[#FFFBEB]0/10'
                   )}>
                     {modeConfig && <modeConfig.icon className={cn('h-7 w-7', modeConfig.color)} />}
                   </div>

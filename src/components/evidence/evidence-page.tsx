@@ -82,10 +82,10 @@ const EVIDENCE_ICONS: Record<string, React.ReactNode> = {
 function getConfidenceBadge(confidence: number | null) {
   if (confidence === null) return null
   if (confidence >= 0.8)
-    return <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">{Math.round(confidence * 100)}% - Verified</Badge>
+    return <Badge className="bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20">{Math.round(confidence * 100)}% - Verified</Badge>
   if (confidence >= 0.5)
-    return <Badge className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20">{Math.round(confidence * 100)}% - Partial</Badge>
-  return <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20">{Math.round(confidence * 100)}% - Low</Badge>
+    return <Badge className="bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20">{Math.round(confidence * 100)}% - Partial</Badge>
+  return <Badge className="bg-[#FEF2F2]0/10 text-[#EF4444] hover:bg-[#FEF2F2]0/20">{Math.round(confidence * 100)}% - Low</Badge>
 }
 
 function formatDate(dateStr: string): string {
@@ -313,7 +313,7 @@ export function EvidencePage({
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+        <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm">
           {error}
         </div>
       )}
@@ -475,9 +475,9 @@ export function EvidencePage({
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           {avgConfidence !== null && avgConfidence >= 0.8 ? (
-                            <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                            <CheckCircle className="h-4 w-4 text-[#22C55E] shrink-0" />
                           ) : evList.length > 0 ? (
-                            <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                            <Clock className="h-4 w-4 text-[#F59E0B] shrink-0" />
                           ) : (
                             <XCircle className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                           )}
@@ -489,8 +489,8 @@ export function EvidencePage({
                             <Badge
                               className={
                                 avgConfidence >= 0.8
-                                  ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
-                                  : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                                  ? 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20'
+                                  : 'bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20'
                               }
                             >
                               {Math.round(avgConfidence * 100)}%

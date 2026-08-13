@@ -73,17 +73,17 @@ const SKILLS_LIST = [
 
 const ACCOUNT_PROVIDERS = [
   { name: 'GitHub', icon: Github, color: 'text-foreground' },
-  { name: 'LinkedIn', icon: Linkedin, color: 'text-sky-600' },
-  { name: 'Figma', icon: Figma, color: 'text-purple-500' },
+  { name: 'LinkedIn', icon: Linkedin, color: 'text-[#3B82F6]' },
+  { name: 'Figma', icon: Figma, color: 'text-[#64748B]' },
   { name: 'Vercel', icon: Globe, color: 'text-foreground' },
-  { name: 'Netlify', icon: Globe, color: 'text-teal-500' },
-  { name: 'Render', icon: Server, color: 'text-emerald-500' },
-  { name: 'Railway', icon: Server, color: 'text-purple-600' },
-  { name: 'Firebase', icon: Flame, color: 'text-amber-500' },
-  { name: 'Supabase', icon: Database, color: 'text-emerald-600' },
-  { name: 'MongoDB Atlas', icon: Database, color: 'text-green-500' },
-  { name: 'Postman', icon: Send, color: 'text-orange-500' },
-  { name: 'Canva', icon: Palette, color: 'text-purple-500' },
+  { name: 'Netlify', icon: Globe, color: 'text-[#64748B]' },
+  { name: 'Render', icon: Server, color: 'text-[#22C55E]' },
+  { name: 'Railway', icon: Server, color: 'text-[#64748B]' },
+  { name: 'Firebase', icon: Flame, color: 'text-[#F59E0B]' },
+  { name: 'Supabase', icon: Database, color: 'text-[#22C55E]' },
+  { name: 'MongoDB Atlas', icon: Database, color: 'text-[#22C55E]' },
+  { name: 'Postman', icon: Send, color: 'text-[#F59E0B]' },
+  { name: 'Canva', icon: Palette, color: 'text-[#64748B]' },
 ]
 
 const stepLabels = ['Personal Info', 'Skills', 'Developer Accounts']

@@ -57,21 +57,21 @@ interface Project {
 // ==================== HELPERS ====================
 
 const statusColors: Record<string, string> = {
-  active: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  completed: 'bg-teal-100 text-teal-700 border-teal-200',
-  on_hold: 'bg-amber-100 text-amber-700 border-amber-200',
-  planning: 'bg-slate-100 text-slate-700 border-slate-200',
+  active: 'bg-[#ECFDF5] text-[#22C55E] border-[#22C55E]/20',
+  completed: 'bg-[#F1F5F9] text-[#64748B] border-[#64748B]/20',
+  on_hold: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20',
+  planning: 'bg-[#F1F5F9] text-[#334155] border-[#E2E8F0]',
 }
 
 const typeColors: Record<string, string> = {
-  'Full Stack Web App': 'bg-violet-100 text-violet-700',
-  'Mobile App': 'bg-pink-100 text-pink-700',
-  'AI/ML Project': 'bg-orange-100 text-orange-700',
-  'Hackathon Project': 'bg-red-100 text-red-700',
-  'College Project': 'bg-cyan-100 text-cyan-700',
-  'Research Project': 'bg-emerald-100 text-emerald-700',
-  'Personal Project': 'bg-amber-100 text-amber-700',
-  Other: 'bg-slate-100 text-slate-600',
+  'Full Stack Web App': 'bg-[#F1F5F9] text-[#64748B]',
+  'Mobile App': 'bg-[#F1F5F9] text-[#64748B]',
+  'AI/ML Project': 'bg-[#FFFBEB] text-[#F59E0B]',
+  'Hackathon Project': 'bg-[#FEF2F2] text-[#EF4444]',
+  'College Project': 'bg-[#F1F5F9] text-[#64748B]',
+  'Research Project': 'bg-[#ECFDF5] text-[#22C55E]',
+  'Personal Project': 'bg-[#FFFBEB] text-[#F59E0B]',
+  Other: 'bg-[#F1F5F9] text-[#475569]',
 }
 
 function formatDate(dateStr: string | null): string {
@@ -133,7 +133,7 @@ function ProjectCard({ project, onView }: { project: Project; onView: () => void
             <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
               {project.name}
             </h3>
-            <Badge variant="outline" className={`text-[10px] px-2 py-0 ${typeColors[project.projectType] || 'bg-slate-100 text-slate-600'}`}>
+            <Badge variant="outline" className={`text-[10px] px-2 py-0 ${typeColors[project.projectType] || 'bg-[#F1F5F9] text-[#475569]'}`}>
               {project.projectType}
             </Badge>
           </div>

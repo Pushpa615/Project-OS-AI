@@ -75,7 +75,7 @@ function ProgressRing({ value, size = 44, strokeWidth = 4, className = '' }: { v
   const radius = (size - strokeWidth) / 2
   const circumference = radius * 2 * Math.PI
   const offset = circumference - (value / 100) * circumference
-  const color = value >= 75 ? 'text-emerald-500' : value >= 40 ? 'text-amber-500' : 'text-red-400'
+  const color = value >= 75 ? 'text-[#22C55E]' : value >= 40 ? 'text-[#F59E0B]' : 'text-[#EF4444]'
 
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`}>
@@ -143,16 +143,16 @@ function formatRelativeTime(dateStr: string): string {
 function getStatusColor(status: string) {
   switch (status) {
     case 'in_progress':
-      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+      return 'bg-[#F59E0B]/10 text-[#F59E0B] dark:text-[#F59E0B] border-[#F59E0B]/20'
     case 'completed':
     case 'verified_completed':
-      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+      return 'bg-[#22C55E]/10 text-[#22C55E] dark:text-[#22C55E] border-[#22C55E]/20'
     case 'not_started':
       return 'bg-muted text-muted-foreground border-border'
     case 'on_hold':
-      return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20'
+      return 'bg-[#F59E0B]/10 text-[#F59E0B] dark:text-[#F59E0B] border-[#F59E0B]/20'
     case 'overdue':
-      return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20'
+      return 'bg-[#EF4444]/10 text-[#EF4444] dark:text-[#EF4444] border-[#EF4444]/20'
     default:
       return 'bg-muted text-muted-foreground border-border'
   }
@@ -161,13 +161,13 @@ function getStatusColor(status: string) {
 function getPriorityColor(priority: string) {
   switch (priority) {
     case 'critical':
-      return 'bg-red-500/10 text-red-700 dark:text-red-400'
+      return 'bg-[#EF4444]/10 text-[#EF4444] dark:text-[#EF4444]'
     case 'high':
-      return 'bg-orange-500/10 text-orange-700 dark:text-orange-400'
+      return 'bg-[#F59E0B]/10 text-[#F59E0B] dark:text-[#F59E0B]'
     case 'medium':
-      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+      return 'bg-[#F59E0B]/10 text-[#F59E0B] dark:text-[#F59E0B]'
     case 'low':
-      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+      return 'bg-[#22C55E]/10 text-[#22C55E] dark:text-[#22C55E]'
     default:
       return 'bg-muted text-muted-foreground'
   }
@@ -482,8 +482,8 @@ export function DashboardPage({ user }: DashboardPageProps) {
                 value={inProgressTasks.length}
                 sub={`${notStartedTasks.length} not started`}
                 icon={Play}
-                iconBg="bg-amber-500/10"
-                iconColor="text-amber-500"
+                iconBg="bg-[#F59E0B]/10"
+                iconColor="text-[#F59E0B]"
                 onClick={() => navigate('tasks')}
               />
               <StatCard
@@ -491,8 +491,8 @@ export function DashboardPage({ user }: DashboardPageProps) {
                 value={overdueTasks.length}
                 sub={overdueTasks.length > 0 ? 'Needs attention' : 'All on track'}
                 icon={AlertTriangle}
-                iconBg="bg-red-500/10"
-                iconColor="text-red-500"
+                iconBg="bg-[#EF4444]/10"
+                iconColor="text-[#EF4444]"
                 onClick={() => navigate('tasks')}
               />
               <StatCard
@@ -500,8 +500,8 @@ export function DashboardPage({ user }: DashboardPageProps) {
                 value={completedTasks.length}
                 sub={totalTasks > 0 ? `${Math.round((completedTasks.length / totalTasks) * 100)}% completion` : 'No tasks yet'}
                 icon={CheckCircle2}
-                iconBg="bg-emerald-500/10"
-                iconColor="text-emerald-500"
+                iconBg="bg-[#22C55E]/10"
+                iconColor="text-[#22C55E]"
               />
             </div>
 
@@ -617,7 +617,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
                                   {project._count.tasks} tasks
                                 </span>
                                 {project.deadline ? (
-                                  <span className={`flex items-center gap-1 ${daysLeft !== null && daysLeft < 0 ? 'text-red-500 font-medium' : daysLeft !== null && daysLeft <= 3 ? 'text-amber-500 font-medium' : ''}`}>
+                                  <span className={`flex items-center gap-1 ${daysLeft !== null && daysLeft < 0 ? 'text-[#EF4444] font-medium' : daysLeft !== null && daysLeft <= 3 ? 'text-[#F59E0B] font-medium' : ''}`}>
                                     <Clock className="h-3 w-3" />
                                     {daysLeft !== null && daysLeft < 0
                                       ? `${Math.abs(daysLeft)}d overdue`
@@ -729,11 +729,11 @@ export function DashboardPage({ user }: DashboardPageProps) {
               <div className="space-y-6">
                 {/* Upcoming Deadline */}
                 {nextProject && nextProject.deadline && (
-                  <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-500/[0.03] to-orange-500/[0.03]">
+                  <Card className="border-0 shadow-sm bg-gradient-to-br from-[#F59E0B]/[0.03] to-[#F59E0B]/[0.03]">
                     <CardContent className="p-5">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                          <Target className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        <div className="h-7 w-7 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center">
+                          <Target className="h-3.5 w-3.5 text-[#F59E0B] dark:text-[#F59E0B]" />
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Next Deadline</span>
                       </div>
@@ -795,7 +795,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
                 <Card className="border-0 shadow-sm">
                   <CardHeader className="pb-2 px-5 pt-5">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <AlertTriangle className="h-4 w-4 text-[#EF4444]" />
                       Overdue Tasks
                       {overdueTasks.length > 0 && (
                         <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">{overdueTasks.length}</Badge>
@@ -805,7 +805,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
                   <CardContent className="pb-5 px-5">
                     {overdueTasks.length === 0 ? (
                       <div className="text-center py-4">
-                        <CheckCircle2 className="h-7 w-7 text-emerald-500/60 mx-auto mb-2" />
+                        <CheckCircle2 className="h-7 w-7 text-[#22C55E]/60 mx-auto mb-2" />
                         <p className="text-xs text-muted-foreground">All tasks on track</p>
                       </div>
                     ) : (
@@ -817,10 +817,10 @@ export function DashboardPage({ user }: DashboardPageProps) {
                               className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                               onClick={() => navigate('task-detail', { id: task.id })}
                             >
-                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                              <AlertTriangle className="h-3.5 w-3.5 text-[#EF4444] shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs font-medium truncate">{task.title}</p>
-                                <p className="text-[10px] text-red-500">{formatDate(task.dueDate)}</p>
+                                <p className="text-[10px] text-[#EF4444]">{formatDate(task.dueDate)}</p>
                               </div>
                               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             </div>
@@ -864,7 +864,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
                       <div className="h-px bg-border" />
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Completion Rate</span>
-                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span className="text-sm font-semibold text-[#22C55E] dark:text-[#22C55E]">
                           {totalTasks > 0 ? `${Math.round((completedTasks.length / totalTasks) * 100)}%` : '--'}
                         </span>
                       </div>

@@ -249,8 +249,8 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
         <Card className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground font-medium">Overall Progress</span>
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <Target className="h-4 w-4 text-emerald-500" />
+            <div className="h-8 w-8 rounded-lg bg-[#ECFDF5]0/10 flex items-center justify-center">
+              <Target className="h-4 w-4 text-[#22C55E]" />
             </div>
           </div>
           <div className="text-2xl font-bold">{analytics?.overallProgress ?? 0}%</div>
@@ -260,8 +260,8 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
         <Card className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground font-medium">Tasks Completed</span>
-            <div className="h-8 w-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-              <CheckCircle className="h-4 w-4 text-teal-500" />
+            <div className="h-8 w-8 rounded-lg bg-[#F1F5F9]/10 flex items-center justify-center">
+              <CheckCircle className="h-4 w-4 text-[#64748B]" />
             </div>
           </div>
           <div className="text-2xl font-bold">{stats?.completed ?? 0}</div>
@@ -273,8 +273,8 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
         <Card className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground font-medium">On-Time Rate</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-              <Clock className="h-4 w-4 text-amber-500" />
+            <div className="h-8 w-8 rounded-lg bg-[#FFFBEB]0/10 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-[#F59E0B]" />
             </div>
           </div>
           <div className="text-2xl font-bold">{analytics?.onTimeRate ?? 0}%</div>
@@ -284,8 +284,8 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
         <Card className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-muted-foreground font-medium">Overdue</span>
-            <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-              <ShieldAlert className="h-4 w-4 text-red-500" />
+            <div className="h-8 w-8 rounded-lg bg-[#FEF2F2]0/10 flex items-center justify-center">
+              <ShieldAlert className="h-4 w-4 text-[#EF4444]" />
             </div>
           </div>
           <div className="text-2xl font-bold">{stats?.overdue ?? 0}</div>
@@ -476,9 +476,9 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                         variant={ms.status === 'completed' ? 'default' : 'secondary'}
                         className={
                           ms.status === 'completed'
-                            ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shrink-0'
+                            ? 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20 shrink-0'
                             : ms.status === 'in_progress'
-                              ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 shrink-0'
+                              ? 'bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20 shrink-0'
                               : 'shrink-0'
                         }
                       >
@@ -515,10 +515,10 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                 <Badge
                   className={
                     (stats?.overdue ?? 0) > 3
-                      ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+                      ? 'bg-[#FEF2F2]0/10 text-[#EF4444] hover:bg-[#FEF2F2]0/20'
                       : (stats?.overdue ?? 0) > 0
-                        ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                        ? 'bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20'
+                        : 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20'
                   }
                 >
                   {(stats?.overdue ?? 0) > 3 ? 'High' : (stats?.overdue ?? 0) > 0 ? 'Medium' : 'Low'}
@@ -536,10 +536,10 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                 <Badge
                   className={
                     teamContribution.length === 0
-                      ? 'bg-slate-500/10 text-slate-600 hover:bg-slate-500/20'
+                      ? 'bg-[#F8FAFC]0/10 text-[#475569] hover:bg-[#F8FAFC]0/20'
                       : (stats?.inProgress ?? 0) > (teamContribution.length * 3)
-                        ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
-                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                        ? 'bg-[#FEF2F2]0/10 text-[#EF4444] hover:bg-[#FEF2F2]0/20'
+                        : 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20'
                   }
                 >
                   {teamContribution.length === 0
@@ -558,7 +558,7 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                   <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">Deadline Proximity</span>
                 </div>
-                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+                <Badge className="bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20">
                   On Track
                 </Badge>
               </div>
@@ -574,10 +574,10 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                 <Badge
                   className={
                     (stats?.blocked ?? 0) > 2
-                      ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+                      ? 'bg-[#FEF2F2]0/10 text-[#EF4444] hover:bg-[#FEF2F2]0/20'
                       : (stats?.blocked ?? 0) > 0
-                        ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                        ? 'bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20'
+                        : 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20'
                   }
                 >
                   {stats?.blocked ?? 0} blocked
@@ -592,7 +592,7 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
             Deadline Risk
           </CardTitle>
           <CardDescription className="text-xs">Upcoming deadlines with risk assessment</CardDescription>
@@ -614,12 +614,12 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                         <div
                           className={`h-2 w-2 rounded-full shrink-0 ${
                             risk === 'critical'
-                              ? 'bg-red-500'
+                              ? 'bg-[#FEF2F2]0'
                               : risk === 'high'
-                                ? 'bg-amber-500'
+                                ? 'bg-[#FFFBEB]0'
                                 : risk === 'medium'
-                                  ? 'bg-yellow-500'
-                                  : 'bg-emerald-500'
+                                  ? 'bg-[#F59E0B]'
+                                  : 'bg-[#ECFDF5]0'
                           }`}
                         />
                         <span className="text-sm font-medium truncate">{ms.title}</span>
@@ -629,12 +629,12 @@ export function AnalyticsPage({ userId, projectId: initialProjectId }: { userId:
                         <Badge
                           className={
                             risk === 'critical'
-                              ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20'
+                              ? 'bg-[#FEF2F2]0/10 text-[#EF4444] hover:bg-[#FEF2F2]0/20'
                               : risk === 'high'
-                                ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                                ? 'bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20'
                                 : risk === 'medium'
-                                  ? 'bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20'
-                                  : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                                  ? 'bg-[#F59E0B]/10 text-[#F59E0B] hover:bg-[#F59E0B]/20'
+                                  : 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20'
                           }
                         >
                           {risk.charAt(0).toUpperCase() + risk.slice(1)}

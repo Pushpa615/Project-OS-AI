@@ -185,8 +185,8 @@ export function AdminPage({ userId }: { userId: string }) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center p-6">
-          <div className="h-16 w-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-            <Shield className="h-8 w-8 text-red-500" />
+          <div className="h-16 w-16 rounded-2xl bg-[#FEF2F2]0/10 flex items-center justify-center mx-auto mb-4">
+            <Shield className="h-8 w-8 text-[#EF4444]" />
           </div>
           <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
           <p className="text-sm text-muted-foreground mb-4">
@@ -205,12 +205,12 @@ export function AdminPage({ userId }: { userId: string }) {
 
   const statCards = systemStats
     ? [
-        { label: 'Total Projects', value: systemStats.totalProjects, icon: <FolderOpen className="h-4 w-4" />, color: 'text-emerald-500 bg-emerald-500/10' },
-        { label: 'Total Users', value: systemStats.totalUsers, icon: <Users className="h-4 w-4" />, color: 'text-teal-500 bg-teal-500/10' },
-        { label: 'Tasks Completed', value: systemStats.completedTasks, icon: <CheckSquare className="h-4 w-4" />, color: 'text-amber-500 bg-amber-500/10' },
-        { label: 'AI Requests', value: systemStats.aiRequests, icon: <Cpu className="h-4 w-4" />, color: 'text-violet-500 bg-violet-500/10' },
-        { label: 'Notifications', value: systemStats.notificationsSent, icon: <Bell className="h-4 w-4" />, color: 'text-cyan-500 bg-cyan-500/10' },
-        { label: 'Integrations', value: systemStats.activeIntegrations, icon: <Link2 className="h-4 w-4" />, color: 'text-pink-500 bg-pink-500/10' },
+        { label: 'Total Projects', value: systemStats.totalProjects, icon: <FolderOpen className="h-4 w-4" />, color: 'text-[#22C55E] bg-[#ECFDF5]/10' },
+        { label: 'Total Users', value: systemStats.totalUsers, icon: <Users className="h-4 w-4" />, color: 'text-[#64748B] bg-[#F1F5F9]/10' },
+        { label: 'Tasks Completed', value: systemStats.completedTasks, icon: <CheckSquare className="h-4 w-4" />, color: 'text-[#F59E0B] bg-[#FFFBEB]/10' },
+        { label: 'AI Requests', value: systemStats.aiRequests, icon: <Cpu className="h-4 w-4" />, color: 'text-[#64748B] bg-[#64748B]/10' },
+        { label: 'Notifications', value: systemStats.notificationsSent, icon: <Bell className="h-4 w-4" />, color: 'text-[#64748B] bg-[#F1F5F9]/10' },
+        { label: 'Integrations', value: systemStats.activeIntegrations, icon: <Link2 className="h-4 w-4" />, color: 'text-[#64748B] bg-[#64748B]/10' },
       ]
     : []
 
@@ -356,10 +356,10 @@ export function AdminPage({ userId }: { userId: string }) {
                             <Badge
                               className={
                                 project.status === 'active'
-                                  ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                                  ? 'bg-[#ECFDF5]/10 text-[#22C55E] hover:bg-[#ECFDF5]/20'
                                   : project.status === 'completed'
-                                    ? 'bg-teal-500/10 text-teal-600 hover:bg-teal-500/20'
-                                    : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                                    ? 'bg-[#F1F5F9]/10 text-[#64748B] hover:bg-[#F1F5F9]/20'
+                                    : 'bg-[#FFFBEB]/10 text-[#F59E0B] hover:bg-[#FFFBEB]/20'
                               }
                             >
                               {project.status}
@@ -415,19 +415,19 @@ export function AdminPage({ userId }: { userId: string }) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Database (SQLite)</span>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Healthy</Badge>
+                  <Badge className="bg-[#ECFDF5]/10 text-[#22C55E] hover:bg-[#ECFDF5]/20">Healthy</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">AI Service (z-ai)</span>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Operational</Badge>
+                  <Badge className="bg-[#ECFDF5]/10 text-[#22C55E] hover:bg-[#ECFDF5]/20">Operational</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Notification Engine</span>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Running</Badge>
+                  <Badge className="bg-[#ECFDF5]/10 text-[#22C55E] hover:bg-[#ECFDF5]/20">Running</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Authentication</span>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Active</Badge>
+                  <Badge className="bg-[#ECFDF5]/10 text-[#22C55E] hover:bg-[#ECFDF5]/20">Active</Badge>
                 </div>
               </div>
             </CardContent>

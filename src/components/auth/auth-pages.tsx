@@ -476,8 +476,8 @@ function ForgotPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
     return (
       <div className="space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
-            <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#22C55E]/10 flex items-center justify-center">
+            <CheckCircle2 className="h-7 w-7 text-[#22C55E]" />
           </div>
           <div className="space-y-1.5">
             <h2 className="text-2xl font-bold tracking-tight">Check your email</h2>
@@ -662,7 +662,7 @@ function ResetPasswordForm({ onSwitch }: { onSwitch: (v: AuthView) => void }) {
 
 function BrandingPanel({ view }: { view: AuthView }) {
   return (
-    <div className="hidden lg:flex lg:w-[55%] xl:w-[58%] relative flex-col justify-between p-8 xl:p-12 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="hidden lg:flex lg:w-[55%] xl:w-[58%] relative flex-col justify-between p-8 xl:p-12 overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0">
         <img
@@ -670,7 +670,7 @@ function BrandingPanel({ view }: { view: AuthView }) {
           alt=""
           className="w-full h-full object-cover opacity-20"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/95 via-slate-900/60 to-slate-900/80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/95 via-[#0F172A]/60 to-[#0F172A]/80" />
       </div>
 
       {/* Content */}
@@ -688,15 +688,15 @@ function BrandingPanel({ view }: { view: AuthView }) {
         {view === 'login' || view === 'forgot-password' || view === 'reset-password' ? (
           <>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 w-fit mb-6">
-              <Zap className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-xs font-medium text-slate-300">AI-Powered Project Management</span>
+              <Zap className="h-3.5 w-3.5 text-[#94A3B8]" />
+              <span className="text-xs font-medium text-[#CBD5E1]">AI-Powered Project Management</span>
             </div>
             <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
               Build projects
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400"> smarter</span>,
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#94A3B8] to-[#64748B]"> smarter</span>,
               <br />not harder
             </h2>
-            <p className="text-slate-300 text-sm xl:text-base leading-relaxed mb-8">
+            <p className="text-[#CBD5E1] text-sm xl:text-base leading-relaxed mb-8">
               The all-in-one AI operating system for student projects. Plan, track, verify, and deliver with intelligent assistance at every step.
             </p>
 
@@ -707,10 +707,10 @@ function BrandingPanel({ view }: { view: AuthView }) {
                   key={feature.title}
                   className="flex items-start gap-2.5 p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/5 hover:bg-white/10 transition-colors"
                 >
-                  <feature.icon className="h-4 w-4 mt-0.5 text-amber-400 shrink-0" />
+                  <feature.icon className="h-4 w-4 mt-0.5 text-[#94A3B8] shrink-0" />
                   <div>
                     <p className="text-xs font-semibold text-white">{feature.title}</p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{feature.desc}</p>
+                    <p className="text-[11px] text-[#94A3B8] leading-relaxed mt-0.5">{feature.desc}</p>
                   </div>
                 </div>
               ))}
@@ -719,15 +719,15 @@ function BrandingPanel({ view }: { view: AuthView }) {
         ) : (
           <>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 w-fit mb-6">
-              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-xs font-medium text-slate-300">Get started in seconds</span>
+              <Sparkles className="h-3.5 w-3.5 text-[#94A3B8]" />
+              <span className="text-xs font-medium text-[#CBD5E1]">Get started in seconds</span>
             </div>
             <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-4">
               Your AI project
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400"> companion</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#94A3B8] to-[#64748B]"> companion</span>
               <br />awaits
             </h2>
-            <p className="text-slate-300 text-sm xl:text-base leading-relaxed mb-8">
+            <p className="text-[#CBD5E1] text-sm xl:text-base leading-relaxed mb-8">
               Join thousands of students delivering exceptional projects. Get AI-powered planning, smart tracking, and automatic documentation.
             </p>
 
@@ -736,12 +736,12 @@ function BrandingPanel({ view }: { view: AuthView }) {
               {FEATURES.map((feature) => (
                 <div key={feature.title} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 transition-colors">
                   <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
-                    <feature.icon className="h-4 w-4 text-emerald-400" />
+                    <feature.icon className="h-4 w-4 text-[#94A3B8]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white">{feature.title}</p>
                   </div>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400/60 shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-[#94A3B8]/60 shrink-0" />
                 </div>
               ))}
             </div>
@@ -755,7 +755,7 @@ function BrandingPanel({ view }: { view: AuthView }) {
           {STATS.map((stat) => (
             <div key={stat.label} className="text-center">
               <p className="text-lg xl:text-xl font-bold text-white">{stat.value}</p>
-              <p className="text-[11px] text-slate-400">{stat.label}</p>
+              <p className="text-[11px] text-[#94A3B8]">{stat.label}</p>
             </div>
           ))}
         </div>

@@ -382,7 +382,7 @@ export function AppShell({
         {/* Footer */}
         <footer className="border-t bg-card px-4 py-2 flex items-center justify-between text-xs text-muted-foreground shrink-0">
           <span className="flex items-center gap-1">
-            Built with <Heart className="h-3 w-3 text-red-400 fill-red-400" /> by Project OS AI
+            Built with <Heart className="h-3 w-3 text-destructive/60 fill-destructive/60" /> by Project OS AI
           </span>
           <span className="hidden sm:inline">v1.0.0</span>
         </footer>

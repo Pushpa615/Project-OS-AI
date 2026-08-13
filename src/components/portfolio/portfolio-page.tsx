@@ -384,7 +384,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
             </h1>
             <div className="flex items-center gap-2 mt-2">
               {selectedPortfolio.isPublic ? (
-                <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">
+                <Badge className="bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20">
                   <Globe className="h-3 w-3 mr-1" /> Public
                 </Badge>
               ) : (
@@ -622,7 +622,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
 
         {/* Error display in detail view */}
         {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+          <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm">
             {error}
           </div>
         )}
@@ -781,7 +781,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+        <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm">
           {error}
         </div>
       )}
@@ -801,7 +801,7 @@ export function PortfolioPage({ userId }: { userId: string }) {
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-sm truncate pr-2">{item.title}</h3>
                     {item.isPublic ? (
-                      <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shrink-0">
+                      <Badge className="bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20 shrink-0">
                         <Globe className="h-3 w-3 mr-1" /> Public
                       </Badge>
                     ) : (

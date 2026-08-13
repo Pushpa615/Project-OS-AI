@@ -45,18 +45,18 @@ const TYPE_CONFIG: Record<
   string,
   { icon: typeof Bell; color: string; bg: string }
 > = {
-  task_assigned: { icon: ListTodo, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/20' },
-  task_status: { icon: ListTodo, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/20' },
-  task_mention: { icon: MessageSquare, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/20' },
-  deadline_approaching: { icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/20' },
-  overdue: { icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/20' },
-  project_invitation: { icon: Users, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/20' },
-  member_joined: { icon: Users, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-100 dark:bg-teal-900/20' },
-  member_removed: { icon: Users, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-900/20' },
+  task_assigned: { icon: ListTodo, color: 'text-[#22C55E] dark:text-[#22C55E]', bg: 'bg-[#ECFDF5] dark:bg-[#22C55E]/20' },
+  task_status: { icon: ListTodo, color: 'text-[#F59E0B] dark:text-[#F59E0B]', bg: 'bg-[#FFFBEB] dark:bg-[#F59E0B]/20' },
+  task_mention: { icon: MessageSquare, color: 'text-[#64748B] dark:text-[#64748B]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
+  deadline_approaching: { icon: Clock, color: 'text-[#F59E0B] dark:text-[#F59E0B]', bg: 'bg-[#FFFBEB] dark:bg-[#F59E0B]/20' },
+  overdue: { icon: AlertTriangle, color: 'text-[#EF4444] dark:text-[#EF4444]', bg: 'bg-[#FEF2F2] dark:bg-[#EF4444]/20' },
+  project_invitation: { icon: Users, color: 'text-[#64748B] dark:text-[#64748B]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
+  member_joined: { icon: Users, color: 'text-[#64748B] dark:text-[#64748B]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
+  member_removed: { icon: Users, color: 'text-[#64748B] dark:text-[#94A3B8]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
   ai_feedback: { icon: Bot, color: 'text-primary', bg: 'bg-primary/10' },
-  report_ready: { icon: FileText, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/20' },
-  meeting: { icon: CalendarDays, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-100 dark:bg-cyan-900/20' },
-  comment: { icon: MessageSquare, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/20' },
+  report_ready: { icon: FileText, color: 'text-[#64748B] dark:text-[#64748B]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
+  meeting: { icon: CalendarDays, color: 'text-[#64748B] dark:text-[#64748B]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
+  comment: { icon: MessageSquare, color: 'text-[#64748B] dark:text-[#64748B]', bg: 'bg-[#F1F5F9] dark:bg-[#64748B]/20' },
 }
 
 const DEFAULT_TYPE_CONFIG = { icon: Bell, color: 'text-muted-foreground', bg: 'bg-muted' }

@@ -196,7 +196,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+          <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm">
             {error}
           </div>
         )}
@@ -225,8 +225,8 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
                       <Badge
                         className={
                           projectReport
-                            ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shrink-0'
-                            : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 shrink-0'
+                            ? 'bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20 shrink-0'
+                            : 'bg-[#FFFBEB]0/10 text-[#F59E0B] hover:bg-[#FFFBEB]0/20 shrink-0'
                         }
                       >
                         {projectReport ? 'Report Ready' : 'No Report'}
@@ -365,7 +365,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+        <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm">
           {error}
         </div>
       )}
@@ -375,7 +375,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-emerald-500" /> Summary
+              <BookOpen className="h-4 w-4 text-[#22C55E]" /> Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -390,7 +390,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-500" /> Strengths
+                <TrendingUp className="h-4 w-4 text-[#22C55E]" /> Strengths
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -402,7 +402,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <TrendingDown className="h-4 w-4 text-amber-500" /> Weaknesses
+                <TrendingDown className="h-4 w-4 text-[#F59E0B]" /> Weaknesses
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -418,7 +418,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" /> Challenges
+                <AlertTriangle className="h-4 w-4 text-[#EF4444]" /> Challenges
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -430,7 +430,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-amber-500" /> Improvements
+                <Lightbulb className="h-4 w-4 text-[#F59E0B]" /> Improvements
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -445,7 +445,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Target className="h-4 w-4 text-violet-500" /> Recommended Skills
+              <Target className="h-4 w-4 text-[#64748B]" /> Recommended Skills
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -465,7 +465,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-emerald-500" /> Overall Assessment
+              <CheckCircle className="h-4 w-4 text-[#22C55E]" /> Overall Assessment
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -479,7 +479,7 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <User className="h-4 w-4 text-teal-500" /> Individual Feedback
+              <User className="h-4 w-4 text-[#64748B]" /> Individual Feedback
             </CardTitle>
             <CardDescription className="text-xs">Per-member assessment</CardDescription>
           </CardHeader>
@@ -496,19 +496,19 @@ export function ReportsPage({ userId, projectId: initialProjectId }: { userId: s
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {fb.strength && (
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-emerald-600">Strengths</p>
+                        <p className="text-xs font-medium text-[#22C55E]">Strengths</p>
                         <p className="text-xs text-muted-foreground">{fb.strength}</p>
                       </div>
                     )}
                     {fb.improvement && (
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-amber-600">Improvements</p>
+                        <p className="text-xs font-medium text-[#F59E0B]">Improvements</p>
                         <p className="text-xs text-muted-foreground">{fb.improvement}</p>
                       </div>
                     )}
                     {fb.nextSteps && (
                       <div className="space-y-1">
-                        <p className="text-xs font-medium text-violet-600">Next Steps</p>
+                        <p className="text-xs font-medium text-[#64748B]">Next Steps</p>
                         <p className="text-xs text-muted-foreground">{fb.nextSteps}</p>
                       </div>
                     )}

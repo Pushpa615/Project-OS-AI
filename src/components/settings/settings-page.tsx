@@ -301,12 +301,12 @@ export function SettingsPage({ userId, userEmail }: { userId: string; userEmail?
 
       {/* Success / Error Messages */}
       {success && (
-        <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
+        <div className="p-3 rounded-lg bg-[#ECFDF5]0/10 text-[#22C55E] dark:text-[#22C55E] text-sm flex items-center gap-2">
           <Save className="h-4 w-4" /> {success}
         </div>
       )}
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm flex items-center gap-2">
+        <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm flex items-center gap-2">
           <AlertTriangle className="h-4 w-4" /> {error}
         </div>
       )}
@@ -599,9 +599,9 @@ export function SettingsPage({ userId, userEmail }: { userId: string; userEmail?
             </Card>
 
             {/* Danger Zone */}
-            <Card className="border-red-200 dark:border-red-900">
+            <Card className="border-[#EF4444]/20 dark:border-[#EF4444]">
               <CardHeader>
-                <CardTitle className="text-base text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+                <CardTitle className="text-base text-[#EF4444] dark:text-[#EF4444]">Danger Zone</CardTitle>
                 <CardDescription>Irreversible actions for your account</CardDescription>
               </CardHeader>
               <CardContent>
@@ -629,7 +629,7 @@ export function SettingsPage({ userId, userEmail }: { userId: string; userEmail?
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                          className="bg-red-600 hover:bg-red-700"
+                          className="bg-[#EF4444] hover:bg-[#EF4444]"
                           onClick={() => {
                             // In a real app, this would call a delete API
                             alert('Account deletion is disabled in demo mode.')

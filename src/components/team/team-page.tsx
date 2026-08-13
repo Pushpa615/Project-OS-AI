@@ -68,8 +68,8 @@ interface TeamAnalytics {
 
 const roleColors: Record<string, string> = {
   leader: 'bg-primary/10 text-primary border-primary/20',
-  member: 'bg-slate-100 text-slate-600 border-slate-200',
-  reviewer: 'bg-amber-100 text-amber-700 border-amber-200',
+  member: 'bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]',
+  reviewer: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20',
 }
 
 const BAR_COLORS = ['#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1']
@@ -306,13 +306,13 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
                 label: 'Tasks Assigned',
                 value: members.reduce((sum, m) => sum + m.totalTasks, 0),
                 icon: Target,
-                color: 'text-amber-600',
+                color: 'text-[#F59E0B]',
               },
               {
                 label: 'Tasks Completed',
                 value: members.reduce((sum, m) => sum + m.completedTasks, 0),
                 icon: CheckCircle,
-                color: 'text-emerald-600',
+                color: 'text-[#22C55E]',
               },
               {
                 label: 'Avg Contribution',
@@ -409,7 +409,7 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-semibold truncate">{member.name}</h3>
-                        {idx === 0 && <Trophy className="h-3.5 w-3.5 text-amber-500" />}
+                        {idx === 0 && <Trophy className="h-3.5 w-3.5 text-[#F59E0B]" />}
                       </div>
                       <Badge
                         variant="outline"
@@ -433,13 +433,13 @@ export function TeamPage({ userId, projectId }: { userId: string; projectId?: st
                       <p className="text-xs text-muted-foreground">Tasks</p>
                       <p className="text-sm font-bold">{member.totalTasks}</p>
                     </div>
-                    <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
+                    <div className="bg-[#ECFDF5] rounded-lg p-2.5 text-center">
                       <p className="text-xs text-muted-foreground">Done</p>
-                      <p className="text-sm font-bold text-emerald-700">{member.completedTasks}</p>
+                      <p className="text-sm font-bold text-[#22C55E]">{member.completedTasks}</p>
                     </div>
-                    <div className="bg-amber-50 rounded-lg p-2.5 text-center">
+                    <div className="bg-[#FFFBEB] rounded-lg p-2.5 text-center">
                       <p className="text-xs text-muted-foreground">In Progress</p>
-                      <p className="text-sm font-bold text-amber-700">{member.inProgressTasks}</p>
+                      <p className="text-sm font-bold text-[#F59E0B]">{member.inProgressTasks}</p>
                     </div>
                     <div className="bg-primary/5 rounded-lg p-2.5 text-center">
                       <p className="text-xs text-muted-foreground">Contribution</p>

@@ -71,20 +71,20 @@ interface Task {
 // ==================== CONSTANTS ====================
 
 const COLUMNS: { key: string; label: string; icon: React.ElementType; color: string }[] = [
-  { key: 'not_started', label: 'Not Started', icon: Circle, color: 'text-slate-400' },
-  { key: 'in_progress', label: 'In Progress', icon: CircleDot, color: 'text-amber-500' },
-  { key: 'blocked', label: 'Blocked', icon: Ban, color: 'text-red-500' },
-  { key: 'submitted', label: 'Submitted', icon: Send, color: 'text-violet-500' },
-  { key: 'under_review', label: 'Under Review', icon: Eye, color: 'text-cyan-500' },
-  { key: 'verified_completed', label: 'Verified Completed', icon: CheckCircle, color: 'text-emerald-500' },
-  { key: 'overdue', label: 'Overdue', icon: XCircle, color: 'text-red-600' },
+  { key: 'not_started', label: 'Not Started', icon: Circle, color: 'text-[#94A3B8]' },
+  { key: 'in_progress', label: 'In Progress', icon: CircleDot, color: 'text-[#F59E0B]' },
+  { key: 'blocked', label: 'Blocked', icon: Ban, color: 'text-[#EF4444]' },
+  { key: 'submitted', label: 'Submitted', icon: Send, color: 'text-[#64748B]' },
+  { key: 'under_review', label: 'Under Review', icon: Eye, color: 'text-[#64748B]' },
+  { key: 'verified_completed', label: 'Verified Completed', icon: CheckCircle, color: 'text-[#22C55E]' },
+  { key: 'overdue', label: 'Overdue', icon: XCircle, color: 'text-[#EF4444]' },
 ]
 
 const priorityConfig: Record<string, { color: string; label: string }> = {
-  critical: { color: 'bg-red-100 text-red-700 border-red-200', label: 'Critical' },
-  high: { color: 'bg-orange-100 text-orange-700 border-orange-200', label: 'High' },
-  medium: { color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Medium' },
-  low: { color: 'bg-slate-100 text-slate-600 border-slate-200', label: 'Low' },
+  critical: { color: 'bg-[#FEF2F2] text-[#EF4444] border-[#EF4444]/20', label: 'Critical' },
+  high: { color: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20', label: 'High' },
+  medium: { color: 'bg-[#FFFBEB] text-[#F59E0B] border-[#F59E0B]/20', label: 'Medium' },
+  low: { color: 'bg-[#F1F5F9] text-[#475569] border-[#E2E8F0]', label: 'Low' },
 }
 
 const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }

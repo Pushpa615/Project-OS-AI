@@ -180,7 +180,7 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 {hasCheckedInToday ? (
                   <>
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <CheckCircle2 className="h-4 w-4 text-[#22C55E]" />
                     Checked in today
                   </>
                 ) : (
@@ -263,7 +263,7 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
                       htmlFor="blocked"
                       className="text-sm font-medium flex items-center gap-2 cursor-pointer"
                     >
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
                       Are you blocked?
                     </label>
                   </div>
@@ -380,14 +380,14 @@ export function CheckinPage({ userId, projectId }: CheckinPageProps) {
                               className={
                                 'h-9 w-9 rounded-lg flex items-center justify-center ' +
                                 (checkin.blocked
-                                  ? 'bg-amber-100 dark:bg-amber-900/20'
-                                  : 'bg-emerald-100 dark:bg-emerald-900/20')
+                                  ? 'bg-[#FFFBEB] dark:bg-[#F59E0B]/20'
+                                  : 'bg-[#ECFDF5] dark:bg-[#22C55E]/20')
                               }
                             >
                               {checkin.blocked ? (
-                                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                <AlertTriangle className="h-4 w-4 text-[#F59E0B] dark:text-[#F59E0B]" />
                               ) : (
-                                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                <CheckCircle2 className="h-4 w-4 text-[#22C55E] dark:text-[#22C55E]" />
                               )}
                             </div>
                             <div>
@@ -458,7 +458,7 @@ function CheckinContent({
       )}
       {checkin.blocked && checkin.blockReason && (
         <div>
-          <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1">
+          <p className="text-xs font-medium text-[#F59E0B] dark:text-[#F59E0B] mb-1 flex items-center gap-1">
             <AlertTriangle className="h-3 w-3" /> Blocked
           </p>
           <p className="text-sm whitespace-pre-wrap">{checkin.blockReason}</p>

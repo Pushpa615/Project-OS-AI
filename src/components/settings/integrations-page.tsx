@@ -49,18 +49,18 @@ interface ProviderConfig {
 // ==================== PROVIDERS ====================
 
 const PROVIDERS: ProviderConfig[] = [
-  { id: 'github', name: 'GitHub', icon: '🐙', description: 'Connect your GitHub repositories', color: 'bg-gray-800' },
-  { id: 'linkedin', name: 'LinkedIn', icon: '💼', description: 'Link your professional profile', color: 'bg-sky-700' },
-  { id: 'figma', name: 'Figma', icon: '🎨', description: 'Connect your design files', color: 'bg-violet-600' },
-  { id: 'vercel', name: 'Vercel', icon: '▲', description: 'Link your Vercel deployments', color: 'bg-gray-900' },
-  { id: 'netlify', name: 'Netlify', icon: '🌐', description: 'Connect Netlify sites', color: 'bg-teal-600' },
-  { id: 'render', name: 'Render', icon: '⚡', description: 'Link Render services', color: 'bg-emerald-600' },
-  { id: 'railway', name: 'Railway', icon: '🚂', description: 'Connect Railway projects', color: 'bg-purple-700' },
-  { id: 'firebase', name: 'Firebase', icon: '🔥', description: 'Link Firebase projects', color: 'bg-amber-500' },
-  { id: 'supabase', name: 'Supabase', icon: '⚡', description: 'Connect Supabase backend', color: 'bg-emerald-500' },
-  { id: 'mongodb', name: 'MongoDB Atlas', icon: '🍃', description: 'Link MongoDB clusters', color: 'bg-green-600' },
-  { id: 'postman', name: 'Postman', icon: '📮', description: 'Connect Postman collections', color: 'bg-orange-500' },
-  { id: 'canva', name: 'Canva', icon: '🖼️', description: 'Link Canva designs', color: 'bg-cyan-600' },
+  { id: 'github', name: 'GitHub', icon: '🐙', description: 'Connect your GitHub repositories', color: 'bg-[#1E293B]' },
+  { id: 'linkedin', name: 'LinkedIn', icon: '💼', description: 'Link your professional profile', color: 'bg-[#3B82F6]' },
+  { id: 'figma', name: 'Figma', icon: '🎨', description: 'Connect your design files', color: 'bg-[#64748B]' },
+  { id: 'vercel', name: 'Vercel', icon: '▲', description: 'Link your Vercel deployments', color: 'bg-[#1E293B]' },
+  { id: 'netlify', name: 'Netlify', icon: '🌐', description: 'Connect Netlify sites', color: 'bg-[#F1F5F9]' },
+  { id: 'render', name: 'Render', icon: '⚡', description: 'Link Render services', color: 'bg-[#22C55E]' },
+  { id: 'railway', name: 'Railway', icon: '🚂', description: 'Connect Railway projects', color: 'bg-[#F1F5F9]' },
+  { id: 'firebase', name: 'Firebase', icon: '🔥', description: 'Link Firebase projects', color: 'bg-[#FFFBEB]0' },
+  { id: 'supabase', name: 'Supabase', icon: '⚡', description: 'Connect Supabase backend', color: 'bg-[#ECFDF5]0' },
+  { id: 'mongodb', name: 'MongoDB Atlas', icon: '🍃', description: 'Link MongoDB clusters', color: 'bg-[#22C55E]' },
+  { id: 'postman', name: 'Postman', icon: '📮', description: 'Connect Postman collections', color: 'bg-[#FFFBEB]0' },
+  { id: 'canva', name: 'Canva', icon: '🖼️', description: 'Link Canva designs', color: 'bg-[#F1F5F9]' },
 ]
 
 // ==================== HELPERS ====================
@@ -213,7 +213,7 @@ export function IntegrationsPage({ userId }: { userId: string }) {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+        <div className="p-3 rounded-lg bg-[#FEF2F2]0/10 text-[#EF4444] dark:text-[#EF4444] text-sm">
           {error}
         </div>
       )}
@@ -236,7 +236,7 @@ export function IntegrationsPage({ userId }: { userId: string }) {
                     </div>
                   </div>
                   {connected ? (
-                    <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 shrink-0">
+                    <Badge className="bg-[#ECFDF5]0/10 text-[#22C55E] hover:bg-[#ECFDF5]0/20 shrink-0">
                       <CheckCircle className="h-3 w-3 mr-1" /> Connected
                     </Badge>
                   ) : (
@@ -258,7 +258,7 @@ export function IntegrationsPage({ userId }: { userId: string }) {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                      className="text-[#EF4444] hover:text-[#EF4444] hover:bg-[#FEF2F2] dark:hover:bg-[#EF4444]"
                       onClick={() => handleDisconnect(connected.id, provider.name)}
                     >
                       <Unlink className="h-3.5 w-3.5 mr-1.5" /> Disconnect
