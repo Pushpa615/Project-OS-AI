@@ -1,13 +1,3 @@
-   110→const resetPasswordSchema = z.object({
-   111→  password: z.string().min(8, 'Password must be at least 8 characters'),
-   112→  confirmPassword: z.string().min(1, 'Please confirm your password'),
-   113→}).refine((data) => data.password === data.confirmPassword, {
-   114→  message: 'Passwords do not match',
-   115→  path: ['confirmPassword'],
-   116→})
-   117→
-   118→// ==================== LOGIN FORM ====================
-   119→
    120→function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthSuccess']; onSwitch: (v: AuthView) => void }) {
    121→  const [showPassword, setShowPassword] = useState(false)
    122→  const [serverError, setServerError] = useState('')

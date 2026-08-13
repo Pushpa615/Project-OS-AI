@@ -595,38 +595,61 @@ export function OnboardingPage({ userId, onComplete }: OnboardingPageProps) {
 
     setSaving(true)
     setError('')
-    try {
-      const res = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          fullName: personalData.fullName,
-          college: personalData.college,
-          course: personalData.course,
-          academicYear: personalData.academicYear,
-          phone: personalData.phone,
-          bio: personalData.bio,
-          skills,
-        }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        // If already onboarded, treat as success and proceed
-        if (data.error?.includes('already completed onboarding')) {
-          onComplete()
-          return
+
+    async function attemptSave(retryCount = 0): Promise<boolean> {
+      try {
+        const res = await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            fullName: personalData.fullName,
+            college: personalData.college,
+            course: personalData.course,
+            academicYear: personalData.academicYear,
+            phone: personalData.phone,
+            bio: personalData.bio,
+            skills,
+          }),
+        })
+        if (!res.ok) {
+          const contentType = res.headers.get('content-type') || ''
+          if (!contentType.includes('application/json')) {
+            // Server returned non-JSON (e.g. 502 HTML page) — likely server restarting
+            if (retryCount < 3) {
+              const delay = Math.pow(2, retryCount) * 1000
+              await new Promise((r) => setTimeout(r, delay))
+              return attemptSave(retryCount + 1)
+            }
+            setError('Server is temporarily unavailable. Please wait a moment and retry.')
+            console.error('Onboarding failed: non-JSON response, status:', res.status)
+            return false
+          }
+          const data = await res.json()
+          if (data.error?.includes('already completed onboarding')) {
+            return true
+          }
+          setError(data.error || 'Failed to save onboarding data')
+          console.error('Failed to save onboarding data:', data.error || res.status)
+          return false
         }
-        setError(data.error || 'Failed to save onboarding data')
-        console.error('Failed to save onboarding data:', data.error || res.status)
-        return
+        return true
+      } catch (err) {
+        if (retryCount < 3) {
+          const delay = Math.pow(2, retryCount) * 1000
+          await new Promise((r) => setTimeout(r, delay))
+          return attemptSave(retryCount + 1)
+        }
+        console.error('Onboarding save error:', err)
+        setError('Network error. Please check your connection and try again.')
+        return false
       }
+    }
+
+    const success = await attemptSave()
+    setSaving(false)
+    if (success) {
       onComplete()
-    } catch (err) {
-      console.error('Onboarding save error:', err)
-      setError('Network error. Please try again.')
-    } finally {
-      setSaving(false)
     }
   }
 

@@ -1,33 +1,3 @@
-   110→const resetPasswordSchema = z.object({
-   111→  password: z.string().min(8, 'Password must be at least 8 characters'),
-   112→  confirmPassword: z.string().min(1, 'Please confirm your password'),
-   113→}).refine((data) => data.password === data.confirmPassword, {
-   114→  message: 'Passwords do not match',
-   115→  path: ['confirmPassword'],
-   116→})
-   117→
-   118→// ==================== LOGIN FORM ====================
-   119→
-   120→function LoginForm({ onSuccess, onSwitch }: { onSuccess: AuthPagesProps['onAuthSuccess']; onSwitch: (v: AuthView) => void }) {
-   121→  const [showPassword, setShowPassword] = useState(false)
-   122→  const [serverError, setServerError] = useState('')
-   123→  const [loading, setLoading] = useState(false)
-   124→
-   125→  const form = useForm<z.infer<typeof loginSchema>>({
-   126→    resolver: zodResolver(loginSchema),
-   127→    defaultValues: { email: '', password: '' },
-   128→  })
-   129→
-   130→  async function onSubmit(values: z.infer<typeof loginSchema>) {
-   131→    setServerError('')
-   132→    setLoading(true)
-   133→    try {
-   134→      const result = await signIn('credentials', {
-   135→        email: values.email,
-   136→        password: values.password,
-   137→        redirect: false,
-   138→      })
-   139→
    140→      if (result?.error) {
    141→        setServerError('Invalid email or password. Please try again.')
    142→        return
